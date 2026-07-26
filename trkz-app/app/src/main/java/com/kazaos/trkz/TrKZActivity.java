@@ -65,13 +65,16 @@ public class TrKZActivity extends AppCompatActivity {
         initializeTrkzField();
 
         if (edtCommand != null) {
-            edtCommand.setOnEditorActionListener((v, actionId, event) -> {
-                String cmd = edtCommand.getText().toString().trim();
-                if (!cmd.isEmpty()) {
-                    executeKazaCommand(cmd);
-                    edtCommand.setText("");
+            edtCommand.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+                @Override
+                public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
+                    String cmd = edtCommand.getText().toString().trim();
+                    if (!cmd.isEmpty()) {
+                        executeKazaCommand(cmd);
+                        edtCommand.setText("");
+                    }
+                    return true;
                 }
-                return true;
             });
         }
     }
@@ -341,7 +344,12 @@ public class TrKZActivity extends AppCompatActivity {
 
     private void scrollToBottom() {
         if (scrollConsole != null) {
-            scrollConsole.post(() => scrollConsole.fullScroll(View.FOCUS_DOWN));
+            scrollConsole.post(new Runnable() {
+                @Override
+                public void run() {
+                    scrollConsole.fullScroll(View.FOCUS_DOWN);
+                }
+            });
         }
     }
 
