@@ -1,0 +1,42 @@
+name: Build TrKZ APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: |
+        cd trkz-app
+        if [ -f gradlew ]; then chmod +x gradlew; fi
+
+    - name: Setup Android NDK & SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Build Debug APK
+      run: |
+        cd trkz-app
+        # Initialize gradle wrapper if not present
+        gradle wrapper
+        ./gradlew assembleDebug --stacktrace
+
+    - name: Upload TrKZ APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: TrKZ-Terminal-v1.1-debug.apk
+        path: trkz-app/app/build/outputs/apk/debug/*.apk
