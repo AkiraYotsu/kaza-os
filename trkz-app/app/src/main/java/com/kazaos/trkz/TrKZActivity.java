@@ -1,6 +1,7 @@
 package com.kazaos.trkz;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -10,7 +11,13 @@ import android.os.Environment;
 import android.provider.Settings;
 import android.text.Html;
 import android.text.Spanned;
+import android.util.DisplayMetrics;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -26,27 +33,39 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class TrKZActivity extends AppCompatActivity {
 
     private static final int REQUEST_STORAGE_PERMISSION = 1001;
+
     private TextView txtConsole;
     private EditText edtCommand;
     private ScrollView scrollConsole;
+    private TextView txtSessionTag;
+    private Button btnNewSession;
+    private float currentTextSizeSp = 13.0f;
+    private ScaleGestureDetector scaleGestureDetector;
 
-    private static boolean isNativeLoaded = false;
-    private File currentDirectory;
+    // Multi-Session Management
+    private static class Session {
+        int id;
+        String name;
+        File currentDir;
+        StringBuilder historyBuffer = new StringBuilder();
 
-    static {
-        try {
-            System.loadLibrary("kaza_native");
-            isNativeLoaded = true;
-        } catch (Throwable t) {
-            isNativeLoaded = false;
+        Session(int id, File initialDir) {
+            this.id = id;
+            this.name = "Session " + id;
+            this.currentDir = initialDir;
         }
     }
+
+    private final List<Session> sessions = new ArrayList<>();
+    private int activeSessionIndex = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,44 +75,102 @@ public class TrKZActivity extends AppCompatActivity {
         txtConsole = findViewById(R.id.txtConsole);
         edtCommand = findViewById(R.id.edtCommand);
         scrollConsole = findViewById(R.id.scrollConsole);
+        txtSessionTag = findViewById(R.id.txtSessionTag);
+        btnNewSession = findViewById(R.id.btnNewSession);
 
-        currentDirectory = getTrkzStorageDir();
+        // Initialize Session 1
+        File defaultHome = getTrkzStorageDir();
+        sessions.add(new Session(1, defaultHome));
 
-        printHeader();
+        // Pinch-to-zoom setup
+        scaleGestureDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override
+            public boolean onScale(ScaleGestureDetector detector) {
+                float scaleFactor = detector.getScaleFactor();
+                currentTextSizeSp *= scaleFactor;
+                if (currentTextSizeSp < 10.0f) currentTextSizeSp = 10.0f;
+                if (currentTextSizeSp > 26.0f) currentTextSizeSp = 26.0f;
+                txtConsole.setTextSize(currentTextSizeSp);
+                return true;
+            }
+        });
+
+        // Tap terminal screen to open keyboard
+        scrollConsole.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                scaleGestureDetector.onTouchEvent(event);
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    showKeyboard();
+                }
+                return false;
+            }
+        });
+
+        // Setup extra key row
+        setupExtraKeys();
+
+        // New Session button
+        btnNewSession.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                createNewSession();
+            }
+        });
+
+        // Enter key listener
+        edtCommand.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                String cmd = edtCommand.getText().toString().trim();
+                if (!cmd.isEmpty()) {
+                    executeKazaCommand(cmd);
+                    edtCommand.setText("");
+                }
+                return true;
+            }
+        });
 
         checkAndRequestStoragePermissions();
-        initializeTrkzField();
-
-        if (edtCommand != null) {
-            edtCommand.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-                @Override
-                public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
-                    String cmd = edtCommand.getText().toString().trim();
-                    if (!cmd.isEmpty()) {
-                        executeKazaCommand(cmd);
-                        edtCommand.setText("");
-                    }
-                    return true;
-                }
-            });
-        }
-    }
-
-    private void printHeader() {
-        appendHtml("<font color='#00FF66'><b>====================================================</b></font><br>");
-        appendHtml("<font color='#00FF66'><b>     KAZA OS v1.1 — TrKZ Standalone Console         </b></font><br>");
-        appendHtml("<font color='#00FF66'><b>====================================================</b></font><br>");
-        appendHtml("<font color='#FFFFFF'>Type 'help' or '/' to view all available commands.</font><br>");
-        appendHtml("<font color='#666666'>TrKZ Field Path: " + currentDirectory.getAbsolutePath() + "</font><br><br>");
+        renderActiveSession();
     }
 
     private File getTrkzStorageDir() {
         File sdcard = Environment.getExternalStorageDirectory();
         File trkzDir = new File(sdcard, "TrKZ");
-        if (!trkzDir.exists()) {
-            trkzDir.mkdirs();
-        }
+        if (!trkzDir.exists()) trkzDir.mkdirs();
         return trkzDir;
+    }
+
+    private Session getActiveSession() {
+        if (activeSessionIndex >= sessions.size()) activeSessionIndex = 0;
+        return sessions.get(activeSessionIndex);
+    }
+
+    private void createNewSession() {
+        int nextId = sessions.size() + 1;
+        Session s = new Session(nextId, getTrkzStorageDir());
+        sessions.add(s);
+        activeSessionIndex = sessions.size() - 1;
+        renderActiveSession();
+        Toast.makeText(this, "Opened " + s.name, Toast.LENGTH_SHORT).show();
+    }
+
+    private void renderActiveSession() {
+        Session s = getActiveSession();
+        txtSessionTag.setText("  [" + s.name + "]");
+        if (s.historyBuffer.length() == 0) {
+            printHeader(s);
+        } else {
+            txtConsole.setText(Html.fromHtml(s.historyBuffer.toString()));
+        }
+        scrollToBottom();
+    }
+
+    private void printHeader(Session s) {
+        appendHtml("TrKZ Terminal v1.1 (" + s.name + ")<br>");
+        appendHtml("<font color='#888888'>Working Dir: " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
+        appendHtml("<font color='#888888'>Type 'help' or '/' for commands.</font><br><br>");
     }
 
     private void executeKazaCommand(String rawInput) {
@@ -101,165 +178,199 @@ public class TrKZActivity extends AppCompatActivity {
         if (clean.startsWith("/")) clean = clean.substring(1);
         if (clean.isEmpty()) return;
 
-        appendHtml("<font color='#00FF66'>kaza@kernel:~$ </font><font color='#FFFFFF'>" + escapeHtml(clean) + "</font><br>");
+        Session s = getActiveSession();
+        appendHtml("<font color='#34d399'>kaza@kernel:~$ </font><font color='#ffffff'>" + escapeHtml(clean) + "</font><br>");
 
         String[] parts = clean.split("\\s+", 2);
         String cmd = parts[0].toLowerCase();
         String args = parts.length > 1 ? parts[1] : "";
 
-        if (cmd.equals("li")) {
-            cmdLi(args);
+        if (cmd.equals("pwd")) {
+            appendHtml("<font color='#ffffff'>" + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br><br>");
+        } else if (cmd.equals("cd")) {
+            cmdCd(s, args);
+        } else if (cmd.equals("li") || cmd.equals("ls")) {
+            cmdLi(s, args);
         } else if (cmd.equals("read") || cmd.equals("cat")) {
-            cmdRead(args);
+            cmdRead(s, args);
         } else if (cmd.equals("write")) {
-            cmdWrite(args);
+            cmdWrite(s, args);
         } else if (cmd.equals("mkdir")) {
-            cmdMkdir(args);
+            cmdMkdir(s, args);
         } else if (cmd.equals("rm")) {
-            cmdRm(args);
+            cmdRm(s, args);
         } else if (cmd.equals("find")) {
-            cmdFind(args);
+            cmdFind(s, args);
         } else if (cmd.equals("calc")) {
             cmdCalc(args);
         } else if (cmd.equals("time") || cmd.equals("date")) {
             cmdTime();
         } else if (cmd.equals("trkz")) {
-            cmdTrkz(args);
+            s.currentDir = getTrkzStorageDir();
+            appendHtml("<font color='#34d399'>Switched workspace -> " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
+            cmdLi(s, "");
+        } else if (cmd.equals("session")) {
+            cmdSession(args);
         } else if (cmd.equals("sysinfo")) {
-            cmdSysinfo();
+            cmdSysinfo(s);
         } else if (cmd.equals("clear")) {
+            s.historyBuffer.setLength(0);
             txtConsole.setText("");
+            printHeader(s);
         } else if (cmd.equals("halt") || cmd.equals("exit")) {
-            appendHtml("<font color='#FF3333'>[KAZA OS] System halted.</font><br><br>");
+            appendHtml("<font color='#f87171'>[KAZA OS] Session stopped.</font><br><br>");
         } else if (cmd.equals("help")) {
             cmdHelp();
         } else {
-            appendHtml("<font color='#FF3333'>ERROR: Command '" + escapeHtml(clean) + "' not found. Type 'help' for command list.</font><br><br>");
+            appendHtml("<font color='#f87171'>kaza: command not found: " + escapeHtml(clean) + "</font><br><br>");
         }
 
         scrollToBottom();
     }
 
-    private void cmdLi(String pathStr) {
-        File targetDir = pathStr.isEmpty() ? currentDirectory : resolvePath(pathStr);
-
-        if (!targetDir.exists() || !targetDir.isDirectory()) {
-            appendHtml("<font color='#FF3333'>ERROR: Directory '" + escapeHtml(targetDir.getAbsolutePath()) + "' not found or inaccessible.</font><br><br>");
+    private void cmdCd(Session s, String pathStr) {
+        if (pathStr.isEmpty() || pathStr.equals("~")) {
+            s.currentDir = getTrkzStorageDir();
+            appendHtml("<font color='#888888'>" + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br><br>");
             return;
         }
 
-        appendHtml("<font color='#00FF66'>Directory listing for: " + escapeHtml(targetDir.getAbsolutePath()) + "</font><br>");
+        File target = resolvePath(s, pathStr);
+        if (target.exists() && target.isDirectory()) {
+            s.currentDir = target;
+            appendHtml("<font color='#888888'>" + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br><br>");
+        } else {
+            appendHtml("<font color='#f87171'>cd: no such file or directory: " + escapeHtml(pathStr) + "</font><br><br>");
+        }
+    }
+
+    private void cmdLi(Session s, String pathStr) {
+        File targetDir = pathStr.isEmpty() ? s.currentDir : resolvePath(s, pathStr);
+
+        if (!targetDir.exists() || !targetDir.isDirectory()) {
+            appendHtml("<font color='#f87171'>ls: cannot access '" + escapeHtml(targetDir.getAbsolutePath()) + "': No such directory</font><br><br>");
+            return;
+        }
+
         File[] files = targetDir.listFiles();
         int count = 0;
         if (files != null) {
             for (File f : files) {
                 count++;
                 if (f.isDirectory()) {
-                    appendHtml("<font color='#00FF66'>[DIR]  " + escapeHtml(f.getName()) + "/</font><br>");
+                    // Folders in BLUE
+                    appendHtml("<font color='#60a5fa'><b>" + escapeHtml(f.getName()) + "/</b></font>  ");
+                } else if (f.canExecute() || f.getName().endsWith(".sh")) {
+                    // Executables in GREEN
+                    appendHtml("<font color='#34d399'>" + escapeHtml(f.getName()) + "</font>  ");
                 } else {
-                    appendHtml("<font color='#FFFFFF'>[FILE] " + escapeHtml(f.getName()) + " (" + f.length() + " bytes)</font><br>");
+                    // Regular files in WHITE
+                    appendHtml("<font color='#ffffff'>" + escapeHtml(f.getName()) + "</font>  ");
                 }
             }
         }
-        appendHtml("<font color='#666666'>Total entries: " + count + "</font><br><br>");
+        appendHtml("<br><font color='#888888'>Total entries: " + count + "</font><br><br>");
     }
 
-    private void cmdRead(String filepath) {
+    private void cmdRead(Session s, String filepath) {
         if (filepath.isEmpty()) {
-            appendHtml("<font color='#FF3333'>ERROR: Usage: read &lt;filepath&gt;</font><br><br>");
+            appendHtml("<font color='#f87171'>read: missing file operand</font><br><br>");
             return;
         }
-        File file = resolvePath(filepath);
+        File file = resolvePath(s, filepath);
         if (!file.exists() || !file.isFile()) {
-            appendHtml("<font color='#FF3333'>ERROR: File '" + escapeHtml(file.getAbsolutePath()) + "' not found or cannot be opened.</font><br><br>");
+            appendHtml("<font color='#f87171'>read: " + escapeHtml(file.getAbsolutePath()) + ": No such file</font><br><br>");
             return;
         }
 
-        appendHtml("<font color='#00FF66'>--- Content of " + escapeHtml(file.getName()) + " ---</font><br>");
+        appendHtml("<font color='#888888'>--- " + escapeHtml(file.getName()) + " ---</font><br>");
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                appendHtml("<font color='#FFFFFF'>" + escapeHtml(line) + "</font><br>");
+                appendHtml("<font color='#ffffff'>" + escapeHtml(line) + "</font><br>");
             }
-            appendHtml("<font color='#00FF66'>--- End of file ---</font><br><br>");
+            appendHtml("<font color='#888888'>--- EOF ---</font><br><br>");
         } catch (Exception e) {
-            appendHtml("<font color='#FF3333'>ERROR: Could not read file: " + escapeHtml(e.getMessage()) + "</font><br><br>");
+            appendHtml("<font color='#f87171'>read: error reading file</font><br><br>");
         }
     }
 
-    private void cmdWrite(String args) {
+    private void cmdWrite(Session s, String args) {
         String[] parts = args.split("\\s+", 2);
         if (parts.length == 0 || parts[0].isEmpty()) {
-            appendHtml("<font color='#FF3333'>ERROR: Usage: write &lt;filepath&gt; &lt;content&gt;</font><br><br>");
+            appendHtml("<font color='#f87171'>write: missing file operand</font><br><br>");
             return;
         }
-        File file = resolvePath(parts[0]);
+        File file = resolvePath(s, parts[0]);
         String text = parts.length > 1 ? parts[1] : "";
 
         try (PrintWriter writer = new PrintWriter(new FileWriter(file, true))) {
             writer.println(text);
-            appendHtml("<font color='#00FF66'>SUCCESS: Data written to '" + escapeHtml(file.getAbsolutePath()) + "'</font><br><br>");
+            appendHtml("<font color='#34d399'>write: saved -> " + escapeHtml(file.getName()) + "</font><br><br>");
         } catch (Exception e) {
-            appendHtml("<font color='#FF3333'>ERROR: Cannot write to file: " + escapeHtml(e.getMessage()) + "</font><br><br>");
+            appendHtml("<font color='#f87171'>write: permission denied</font><br><br>");
         }
     }
 
-    private void cmdMkdir(String dirpath) {
+    private void cmdMkdir(Session s, String dirpath) {
         if (dirpath.isEmpty()) {
-            appendHtml("<font color='#FF3333'>ERROR: Usage: mkdir &lt;dirpath&gt;</font><br><br>");
+            appendHtml("<font color='#f87171'>mkdir: missing operand</font><br><br>");
             return;
         }
-        File dir = resolvePath(dirpath);
+        File dir = resolvePath(s, dirpath);
         if (dir.mkdirs() || dir.exists()) {
-            appendHtml("<font color='#00FF66'>SUCCESS: Directory '" + escapeHtml(dir.getAbsolutePath()) + "' created.</font><br><br>");
+            appendHtml("<font color='#34d399'>mkdir: created -> " + escapeHtml(dir.getName()) + "</font><br><br>");
         } else {
-            appendHtml("<font color='#FF3333'>ERROR: Could not create directory '" + escapeHtml(dir.getAbsolutePath()) + "'.</font><br><br>");
+            appendHtml("<font color='#f87171'>mkdir: cannot create directory</font><br><br>");
         }
     }
 
-    private void cmdRm(String pathStr) {
+    private void cmdRm(Session s, String pathStr) {
         if (pathStr.isEmpty()) {
-            appendHtml("<font color='#FF3333'>ERROR: Usage: rm &lt;filepath&gt;</font><br><br>");
+            appendHtml("<font color='#f87171'>rm: missing operand</font><br><br>");
             return;
         }
-        File target = resolvePath(pathStr);
+        File target = resolvePath(s, pathStr);
         if (target.exists() && target.delete()) {
-            appendHtml("<font color='#00FF66'>SUCCESS: File/Directory '" + escapeHtml(target.getName()) + "' removed.</font><br><br>");
+            appendHtml("<font color='#888888'>rm: removed -> " + escapeHtml(target.getName()) + "</font><br><br>");
         } else {
-            appendHtml("<font color='#FF3333'>ERROR: Could not remove '" + escapeHtml(target.getAbsolutePath()) + "'.</font><br><br>");
+            appendHtml("<font color='#f87171'>rm: cannot remove '" + escapeHtml(pathStr) + "'</font><br><br>");
         }
     }
 
-    private void cmdFind(String args) {
+    private void cmdFind(Session s, String args) {
         String[] parts = args.split("\\s+", 2);
         String keyword = parts[0];
         if (keyword.isEmpty()) {
-            appendHtml("<font color='#FF3333'>ERROR: Usage: find &lt;keyword&gt; [path]</font><br><br>");
+            appendHtml("<font color='#f87171'>find: missing keyword</font><br><br>");
             return;
         }
-        File baseDir = parts.length > 1 ? resolvePath(parts[1]) : currentDirectory;
+        File baseDir = parts.length > 1 ? resolvePath(s, parts[1]) : s.currentDir;
         if (!baseDir.exists() || !baseDir.isDirectory()) {
-            appendHtml("<font color='#FF3333'>ERROR: Path '" + escapeHtml(baseDir.getAbsolutePath()) + "' inaccessible.</font><br><br>");
+            appendHtml("<font color='#f87171'>find: path inaccessible</font><br><br>");
             return;
         }
 
-        appendHtml("<font color='#00FF66'>Searching for '" + escapeHtml(keyword) + "' in '" + escapeHtml(baseDir.getAbsolutePath()) + "'...</font><br>");
         File[] files = baseDir.listFiles();
         int matches = 0;
         if (files != null) {
             for (File f : files) {
                 if (f.getName().toLowerCase().contains(keyword.toLowerCase())) {
                     matches++;
-                    appendHtml("<font color='#FFFFFF'>  -&gt; Found: " + escapeHtml(f.getAbsolutePath()) + "</font><br>");
+                    if (f.isDirectory()) {
+                        appendHtml("<font color='#60a5fa'>  [DIR]  " + escapeHtml(f.getAbsolutePath()) + "</font><br>");
+                    } else {
+                        appendHtml("<font color='#ffffff'>  [FILE] " + escapeHtml(f.getAbsolutePath()) + "</font><br>");
+                    }
                 }
             }
         }
-        appendHtml("<font color='#666666'>Search finished. " + matches + " match(es) found.</font><br><br>");
+        appendHtml("<font color='#888888'>find: " + matches + " match(es)</font><br><br>");
     }
 
     private void cmdCalc(String expr) {
         if (expr.isEmpty()) {
-            appendHtml("<font color='#FF3333'>ERROR: Usage: calc &lt;num1&gt; &lt;op&gt; &lt;num2&gt; (e.g. calc 25 * 4)</font><br><br>");
+            appendHtml("<font color='#f87171'>calc: missing expression (e.g. calc 25 * 4)</font><br><br>");
             return;
         }
         try {
@@ -272,69 +383,87 @@ public class TrKZActivity extends AppCompatActivity {
             else if (op.equals("-")) res = a - b;
             else if (op.equals("*")) res = a * b;
             else if (op.equals("/")) {
-                if (b == 0) { appendHtml("<font color='#FF3333'>ERROR: Division by zero.</font><br><br>"); return; }
+                if (b == 0) { appendHtml("<font color='#f87171'>calc: division by zero</font><br><br>"); return; }
                 res = a / b;
             }
-            appendHtml("<font color='#00FF66'>RESULT: " + a + " " + op + " " + b + " = " + res + "</font><br><br>");
+            appendHtml("<font color='#34d399'>= " + res + "</font><br><br>");
         } catch (Exception e) {
-            appendHtml("<font color='#FF3333'>ERROR: Invalid expression. Example: calc 100 / 4</font><br><br>");
+            appendHtml("<font color='#f87171'>calc: invalid format</font><br><br>");
         }
     }
 
     private void cmdTime() {
         String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
-        appendHtml("<font color='#00FF66'>System Time: " + now + "</font><br><br>");
+        appendHtml("<font color='#888888'>" + now + "</font><br><br>");
     }
 
-    private void cmdTrkz(String arg) {
-        currentDirectory = getTrkzStorageDir();
-        if (arg.equalsIgnoreCase("status")) {
-            appendHtml("<font color='#00FF66'>--- TrKZ Storage Field Status ---</font><br>");
-            appendHtml("<font color='#FFFFFF'>Field Path       : " + escapeHtml(currentDirectory.getAbsolutePath()) + "</font><br>");
-            appendHtml("<font color='#00FF66'>Android Storage : Granted / Active</font><br>");
-            appendHtml("<font color='#FFFFFF'>Sync Mode       : Direct Physical Disk Mirror</font><br><br>");
-            return;
+    private void cmdSession(String arg) {
+        if (arg.isEmpty()) {
+            appendHtml("<font color='#888888'>Sessions:</font><br>");
+            for (int i = 0; i < sessions.size(); i++) {
+                Session s = sessions.get(i);
+                String activeTag = (i == activeSessionIndex) ? " *" : "";
+                appendHtml("<font color='#ffffff'>  " + s.name + activeTag + " (" + escapeHtml(s.currentDir.getName()) + ")</font><br>");
+            }
+            appendHtml("<br>");
+
+        } else if (arg.equalsIgnoreCase("new")) {
+            createNewSession();
+        } else {
+            try {
+                int idx = Integer.parseInt(arg) - 1;
+                if (idx >= 0 && idx < sessions.size()) {
+                    activeSessionIndex = idx;
+                    renderActiveSession();
+                } else {
+                    appendHtml("<font color='#f87171'>session: invalid session index</font><br><br>");
+                }
+            } catch (Exception e) {
+                appendHtml("<font color='#f87171'>session: usage: session [new | <number>]</font><br><br>");
+            }
         }
-        appendHtml("<font color='#00FF66'>[TrKZ FIELD] Switched workspace to '" + escapeHtml(currentDirectory.getAbsolutePath()) + "'</font><br>");
-        cmdLi("");
     }
 
-    private void cmdSysinfo() {
-        appendHtml("<font color='#00FF66'>--- Kaza OS Environment Info ---</font><br>");
-        appendHtml("<font color='#FFFFFF'>App Package  : com.kazaos.trkz</font><br>");
-        appendHtml("<font color='#FFFFFF'>Architecture : ARM64 / POSIX Native Core</font><br>");
-        appendHtml("<font color='#00FF66'>Status       : Active &amp; Functioning 100%</font><br>");
-        appendHtml("<font color='#FFFFFF'>TrKZ Field   : " + escapeHtml(currentDirectory.getAbsolutePath()) + "</font><br><br>");
+    private void cmdSysinfo(Session s) {
+        appendHtml("<font color='#888888'>--- System Info ---</font><br>");
+        appendHtml("<font color='#ffffff'>OS          : Kaza OS v1.1</font><br>");
+        appendHtml("<font color='#ffffff'>App         : TrKZ Terminal (com.kazaos.trkz)</font><br>");
+        appendHtml("<font color='#ffffff'>Active Dir  : " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
+        appendHtml("<font color='#34d399'>Storage     : Full System Access Granted</font><br><br>");
     }
 
     private void cmdHelp() {
-        appendHtml("<font color='#00FF66'>Available Commands (v1.1 TrKZ Field Edition):</font><br>");
-        appendHtml("<font color='#FFFFFF'>  trkz [status]       - Open TrKZ Storage Field (/sdcard/TrKZ)</font><br>");
-        appendHtml("<font color='#FFFFFF'>  li [path]           - List directory contents</font><br>");
-        appendHtml("<font color='#FFFFFF'>  read / cat &lt;file&gt;   - Read text file content</font><br>");
-        appendHtml("<font color='#FFFFFF'>  write &lt;file&gt; &lt;txt&gt;  - Append text to file</font><br>");
-        appendHtml("<font color='#FFFFFF'>  mkdir &lt;dirpath&gt;     - Create new directory</font><br>");
-        appendHtml("<font color='#FFFFFF'>  rm &lt;filepath&gt;       - Remove file or directory</font><br>");
-        appendHtml("<font color='#FFFFFF'>  find &lt;keyword&gt;      - Search files in directory</font><br>");
-        appendHtml("<font color='#FFFFFF'>  calc &lt;a op b&gt;       - Math calculator (e.g. calc 25 * 4)</font><br>");
-        appendHtml("<font color='#FFFFFF'>  time / date         - Display system clock</font><br>");
-        appendHtml("<font color='#FFFFFF'>  clear               - Clear terminal screen</font><br>");
-        appendHtml("<font color='#FFFFFF'>  exit / halt         - Exit Kaza OS shell</font><br><br>");
+        appendHtml("<font color='#888888'>Commands:</font><br>");
+        appendHtml("<font color='#ffffff'>  pwd               - Print working directory</font><br>");
+        appendHtml("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory (e.g. cd /sdcard/Download)</font><br>");
+        appendHtml("<font color='#ffffff'>  ls / li [path]    - List files (Directories in BLUE)</font><br>");
+        appendHtml("<font color='#ffffff'>  read / cat &lt;file&gt;  - Read text file</font><br>");
+        appendHtml("<font color='#ffffff'>  write &lt;file&gt; &lt;txt&gt; - Append text to file</font><br>");
+        appendHtml("<font color='#ffffff'>  mkdir / rm        - Create or remove files/folders</font><br>");
+        appendHtml("<font color='#ffffff'>  find &lt;kw&gt; [path]  - Search files</font><br>");
+        appendHtml("<font color='#ffffff'>  calc / time       - System tools</font><br>");
+        appendHtml("<font color='#ffffff'>  session [new|n]   - Manage multi-sessions</font><br>");
+        appendHtml("<font color='#ffffff'>  clear / exit      - Clear or exit session</font><br><br>");
     }
 
-    private File resolvePath(String pathStr) {
+    private File resolvePath(Session s, String pathStr) {
         if (pathStr.startsWith("/")) {
             return new File(pathStr);
         }
-        return new File(currentDirectory, pathStr);
+        if (pathStr.equals("..")) {
+            File parent = s.currentDir.getParentFile();
+            return parent != null ? parent : s.currentDir;
+        }
+        return new File(s.currentDir, pathStr);
     }
 
     private void appendHtml(String htmlText) {
-        if (txtConsole != null) {
-            Spanned spanned = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ?
-                    Html.fromHtml(htmlText, Html.FROM_HTML_MODE_LEGACY) : Html.fromHtml(htmlText);
-            txtConsole.append(spanned);
-        }
+        Session s = getActiveSession();
+        s.historyBuffer.append(htmlText);
+        Spanned spanned = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ?
+                Html.fromHtml(s.historyBuffer.toString(), Html.FROM_HTML_MODE_LEGACY) :
+                Html.fromHtml(s.historyBuffer.toString());
+        txtConsole.setText(spanned);
     }
 
     private String escapeHtml(String text) {
@@ -350,6 +479,38 @@ public class TrKZActivity extends AppCompatActivity {
                     scrollConsole.fullScroll(View.FOCUS_DOWN);
                 }
             });
+        }
+    }
+
+    private void showKeyboard() {
+        if (edtCommand != null) {
+            edtCommand.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(edtCommand, InputMethodManager.SHOW_IMPLICIT);
+            }
+        }
+    }
+
+    private void setupExtraKeys() {
+        findViewById(R.id.keyCtrl).setOnClickListener(v -> insertText("^"));
+        findViewById(R.id.keySlash).setOnClickListener(v -> insertText("/"));
+        findViewById(R.id.keyTab).setOnClickListener(v -> insertText("  "));
+        findViewById(R.id.keyEsc).setOnClickListener(v -> edtCommand.setText(""));
+        findViewById(R.id.keyHome).setOnClickListener(v -> executeKazaCommand("cd ~"));
+        findViewById(R.id.keyUp).setOnClickListener(v -> insertText("▲"));
+        findViewById(R.id.keyDown).setOnClickListener(v -> insertText("▼"));
+        findViewById(R.id.keyLeft).setOnClickListener(v -> insertText("◄"));
+        findViewById(R.id.keyRight).setOnClickListener(v -> insertText("►"));
+        findViewById(R.id.keyPgUp).setOnClickListener(v -> scrollConsole.pageScroll(View.FOCUS_UP));
+        findViewById(R.id.keyPgDn).setOnClickListener(v -> scrollConsole.pageScroll(View.FOCUS_DOWN));
+    }
+
+    private void insertText(String str) {
+        if (edtCommand != null) {
+            int start = Math.max(edtCommand.getSelectionStart(), 0);
+            int end = Math.max(edtCommand.getSelectionEnd(), 0);
+            edtCommand.getText().replace(Math.min(start, end), Math.max(start, end), str, 0, str.length());
         }
     }
 
@@ -375,14 +536,5 @@ public class TrKZActivity extends AppCompatActivity {
                         REQUEST_STORAGE_PERMISSION);
             }
         }
-    }
-
-    private void initializeTrkzField() {
-        try {
-            File trkzDir = getTrkzStorageDir();
-            if (trkzDir.exists()) {
-                Toast.makeText(this, "TrKZ Storage Field Active!", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception ignored) {}
     }
 }
