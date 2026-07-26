@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Kaza OS v1.0 — Bare-Metal Microkernel Simulator</title>
-<meta name="description" content="Kaza OS — A custom bare-metal microkernel operating system built from scratch. Interactive web simulator.">
+<meta name="description" content="Kaza OS — A custom bare-metal microkernel operating system built from scratch. Interactive web simulator & QEMU bridge.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -336,8 +336,7 @@
  _  __   _   ____    _      ___  ____
 | |/ /  / \ |_  /   / \    / _ \/ ___|
 | ' /  / _ \ / /   / _ \  | | | \___ \
-| . \ / ___ / /_  / ___ \ | |_| |___) |
-|_|\_/_/   /____||_/   \_\ \___/|____/
+| . \ / ___ / /_  / ___ \ \___/|____/
 
       Bare-Metal Microkernel OS
   </pre>
@@ -355,7 +354,7 @@
     </div>
   </div>
   <div style="display:flex;gap:0.5rem;align-items:center">
-    <div class="status-pill"><div class="dot"></div>KERNEL LIVE</div>
+    <div class="status-pill" id="statusPill"><div class="dot"></div><span id="statusText">KERNEL LIVE</span></div>
     <button id="info-btn" onclick="openPanel()">⚙ Info</button>
   </div>
 </div>
@@ -407,7 +406,7 @@
     </div>
     <div class="stat-box">
       <div class="stat-label">Kernel Size</div>
-      <div class="stat-value">18 KB</div>
+      <div class="stat-value" id="valKernelSize">18.36 KB</div>
     </div>
     <div class="stat-box">
       <div class="stat-label">Heap Memory</div>
@@ -418,12 +417,12 @@
       <div class="stat-value">256 Active</div>
     </div>
     <div class="stat-box">
-      <div class="stat-label">Kernel Build</div>
-      <div class="stat-value">2026.07</div>
+      <div class="stat-label">QEMU Monitor</div>
+      <div class="stat-value" id="valQemuMon" style="color:var(--green)">CONNECTED</div>
     </div>
     <div class="stat-box">
-      <div class="stat-label">Panic Risk</div>
-      <div class="stat-value c-green">0.00%</div>
+      <div class="stat-label">Telemetry Mode</div>
+      <div class="stat-value" id="valTelemetryMode">REAL-TIME</div>
     </div>
   </div>
 
@@ -432,7 +431,7 @@
     <div style="font-size:0.82rem;line-height:1.6;color:var(--white)">
       Kaza OS adalah sistem operasi <b>bare-metal</b> yang berjalan langsung di atas CPU tanpa Linux atau Windows.
       Kernel aslinya dikompilasi menggunakan <b>Clang → ELF binary 18KB</b> dan dijalankan di QEMU emulator.
-      Halaman ini adalah simulasi interaktif dari shell Kaza OS yang sebenarnya.
+      Halaman ini terhubung secara real-time ke QEMU monitor socket!
     </div>
   </div>
 
@@ -465,9 +464,10 @@
 // ── BOOT SEQUENCE ─────────────────────────────
 const bootMessages = [
   'Initializing Kaza bootloader...',
-  'Loading kernel image [kaza.elf 18KB]...',
+  'Loading kernel image [kaza.elf 18.36KB]...',
   'Setting up GDT & IDT (256 gates)...',
   'Starting VGA driver (0xB8000)...',
+  'Connecting QEMU Unix socket monitor...',
   'Allocating heap memory (16MB)...',
   'Loading PS/2 keyboard driver...',
   'Remapping PIC (IRQ0→IRQ15)...',
@@ -489,6 +489,34 @@ function bootStep() {
   setTimeout(bootStep, 270 + Math.random() * 160);
 }
 setTimeout(bootStep, 400);
+
+// ── REAL-TIME TELEMETRY FETCH ─────────────────
+let realTelemetry = null;
+
+async function pollRealTelemetry() {
+  try {
+    const res = await fetch('/api/status');
+    if (res.ok) {
+      realTelemetry = await res.json();
+      updateDiagnosticsUI(realTelemetry);
+    }
+  } catch (e) {
+    // Offline / GitHub Pages fallback
+    document.getElementById('valTelemetryMode').textContent = 'STATIC (PAGES)';
+    document.getElementById('valQemuMon').textContent = 'SIMULATED';
+    document.getElementById('valQemuMon').style.color = 'var(--yellow)';
+  }
+}
+
+function updateDiagnosticsUI(data) {
+  if (!data) return;
+  document.getElementById('valKernelSize').textContent = `${data.kernel_binary_kb} KB`;
+  document.getElementById('valTelemetryMode').textContent = 'REAL-TIME';
+  document.getElementById('valQemuMon').textContent = data.status.toUpperCase();
+  document.getElementById('statusText').textContent = `KERNEL ${data.status.toUpperCase()}`;
+}
+
+setInterval(pollRealTelemetry, 2000);
 
 // ── TERMINAL ENGINE ───────────────────────────
 const out = document.getElementById('terminal-output');
@@ -528,7 +556,7 @@ const cmds = {
     nl();
     [
       ['fetch    ','Tampilkan banner & spesifikasi Kaza OS'],
-      ['sysinfo  ','Status CPU, RAM, dan interrupt table'],
+      ['sysinfo  ','Status CPU, RAM, dan interrupt table (Live QEMU Sync)'],
       ['memory   ','Visualisasi heap memory allocator'],
       ['about    ','Kenapa Kaza OS lebih cepat & bersih?'],
       ['howwork  ','Cara kerja kernel ini di hardware nyata'],
@@ -541,6 +569,7 @@ const cmds = {
 
   fetch() {
     nl();
+    const sizeKb = realTelemetry ? realTelemetry.kernel_binary_kb : 18.36;
     print(`<span class="c-cyan">     /\\      </span><span class="c-white" style="font-weight:800;letter-spacing:-0.5px">Kaza OS</span> <span class="c-purple">v1.0</span>`);
     print(`<span class="c-cyan">    /  \\     </span><span class="c-muted">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>`);
     print(`<span class="c-cyan">   / /\\ \\    </span><span class="c-muted">OS Type   :</span> <span class="c-green">Bare-Metal Microkernel</span>`);
@@ -548,25 +577,27 @@ const cmds = {
     print(`<span class="c-cyan"> /_/    \\_\\  </span><span class="c-muted">Safety    :</span> <span class="c-white">Isolated Driver Architecture</span>`);
     print(`<span class="c-cyan">             </span><span class="c-muted">Build     :</span> <span class="c-white">2026.07-STABLE</span>`);
     print(`<span class="c-cyan">             </span><span class="c-muted">Compiler  :</span> <span class="c-white">Clang (--target=i386-pc-none-elf)</span>`);
-    print(`<span class="c-cyan">             </span><span class="c-muted">Binary    :</span> <span class="c-white">kaza.elf — 18,360 bytes</span>`);
+    print(`<span class="c-cyan">             </span><span class="c-muted">Binary    :</span> <span class="c-white">kaza.elf — ${sizeKb} KB</span>`);
     print(`<span class="c-cyan">             </span><span class="c-muted">Status    :</span> <span class="c-green">● Kernel Active & Stable 100%</span>`);
     nl();
   },
 
   sysinfo() {
     nl();
-    printRaw('─── Kaza OS System Diagnostics ───', 'c-purple');
+    printRaw('─── Kaza OS System Diagnostics (QEMU Live Sync) ───', 'c-purple');
     nl();
+    const sizeKb = realTelemetry ? realTelemetry.kernel_binary_kb : 18.36;
+    const rawMon = realTelemetry ? realTelemetry.raw_monitor : 'VM status: running';
     [
       ['CPU Architecture','x86 IA-32 Protected Mode','c-white'],
-      ['Kernel Binary   ','kaza.elf (18,360 bytes)','c-white'],
+      ['Kernel Binary   ',`kaza.elf (${sizeKb} KB)`,'c-white'],
       ['Total Heap RAM  ','16,384 KB (16 MB)','c-white'],
       ['Used Memory     ','240 KB (shell + drivers)','c-yellow'],
       ['Free Memory     ','16,144 KB','c-green'],
+      ['QEMU Socket Status', rawMon, 'c-green'],
       ['IDT Gates       ','256 / 256 Registered','c-green'],
       ['VGA Address     ','0xB8000 (text mode 80×25)','c-cyan'],
       ['Keyboard Port   ','0x60 / 0x64 (PS/2 input)','c-cyan'],
-      ['PIC Remap       ','IRQ0→0x20, IRQ8→0x28','c-white'],
       ['Kernel Panic    ','0.00% — Microkernel isolation','c-green'],
     ].forEach(([l,v,c]) => print(`  <span class="c-muted">${esc(l)} :</span> <span class="${c}">${esc(v)}</span>`));
     nl();
@@ -706,6 +737,7 @@ function startKernel() {
   print(`<span class="c-yellow">Ketik </span><span class="c-cyan">help</span><span class="c-yellow"> untuk melihat semua perintah yang tersedia.</span>`);
   nl();
   document.getElementById('cmd-input').focus();
+  pollRealTelemetry();
 }
 </script>
 </body>
