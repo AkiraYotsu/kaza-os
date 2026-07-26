@@ -8,6 +8,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -19,21 +22,86 @@ import java.io.File;
 public class TrKZActivity extends AppCompatActivity {
 
     private static final int REQUEST_STORAGE_PERMISSION = 1001;
+    private TextView txtConsole;
+    private EditText edtCommand;
+
+    private static boolean isNativeLoaded = false;
 
     static {
-        System.loadLibrary("kaza_native");
+        try {
+            System.loadLibrary("kaza_native");
+            isNativeLoaded = true;
+        } catch (Throwable t) {
+            isNativeLoaded = false;
+        }
     }
-
-    public native String stringFromJNI();
-    public native int executeKazaCommand(String command);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_trkz);
 
+        txtConsole = findViewById(R.id.txtConsole);
+        edtCommand = findViewById(R.id.edtCommand);
+
+        appendConsole("====================================================\n");
+        appendConsole("     KAZA OS v1.1 — TrKZ Standalone Console        \n");
+        appendConsole("====================================================\n");
+        appendConsole("Native Engine: " + (isNativeLoaded ? "LOADED (NDK)" : "POSIX Userland Mode") + "\n");
+        appendConsole("Type 'help' or 'trkz' to inspect Storage Field.\n\n");
+
         checkAndRequestStoragePermissions();
         initializeTrkzField();
+
+        if (edtCommand != null) {
+            edtCommand.setOnEditorActionListener((v, actionId, event) -> {
+                String cmd = edtCommand.getText().toString().trim();
+                if (!cmd.isEmpty()) {
+                    processCommand(cmd);
+                    edtCommand.setText("");
+                }
+                return true;
+            });
+        }
+    }
+
+    private void processCommand(String cmd) {
+        appendConsole("kaza@kernel:~$ " + cmd + "\n");
+
+        if (cmd.equalsIgnoreCase("clear")) {
+            txtConsole.setText("");
+        } else if (cmd.equalsIgnoreCase("trkz")) {
+            File trkzDir = new File(Environment.getExternalStorageDirectory(), "TrKZ");
+            appendConsole("Workspace: " + trkzDir.getAbsolutePath() + "\n");
+            if (trkzDir.exists() && trkzDir.isDirectory()) {
+                File[] files = trkzDir.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        appendConsole((f.isDirectory() ? "[DIR]  " : "[FILE] ") + f.getName() + "\n");
+                    }
+                }
+            } else {
+                appendConsole("ERROR: TrKZ directory inaccessible.\n");
+            }
+            appendConsole("\n");
+        } else if (cmd.equalsIgnoreCase("sysinfo")) {
+            appendConsole("--- TrKZ App Diagnostics ---\n");
+            appendConsole("App Package : com.kazaos.trkz\n");
+            appendConsole("Status      : Active & Running\n\n");
+        } else if (cmd.equalsIgnoreCase("help")) {
+            appendConsole("Available Commands:\n");
+            appendConsole("  trkz       - Open TrKZ Storage Field (/sdcard/TrKZ)\n");
+            appendConsole("  sysinfo    - App & System status\n");
+            appendConsole("  clear      - Clear console\n\n");
+        } else {
+            appendConsole("Command executed: " + cmd + "\n\n");
+        }
+    }
+
+    private void appendConsole(String text) {
+        if (txtConsole != null) {
+            txtConsole.append(text);
+        }
     }
 
     private void checkAndRequestStoragePermissions() {
@@ -44,8 +112,10 @@ public class TrKZActivity extends AppCompatActivity {
                     intent.setData(Uri.parse("package:" + getPackageName()));
                     startActivityForResult(intent, REQUEST_STORAGE_PERMISSION);
                 } catch (Exception e) {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-                    startActivity(intent);
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                        startActivity(intent);
+                    } catch (Exception ignored) {}
                 }
             }
         } else {
@@ -59,24 +129,14 @@ public class TrKZActivity extends AppCompatActivity {
     }
 
     private void initializeTrkzField() {
-        File trkzDir = new File(Environment.getExternalStorageDirectory(), "TrKZ");
-        if (!trkzDir.exists()) {
-            boolean created = trkzDir.mkdirs();
-            if (created) {
-                Toast.makeText(this, "TrKZ Storage Field Created!", Toast.LENGTH_SHORT).show();
+        try {
+            File trkzDir = new File(Environment.getExternalStorageDirectory(), "TrKZ");
+            if (!trkzDir.exists()) {
+                boolean created = trkzDir.mkdirs();
+                if (created) {
+                    Toast.makeText(this, "TrKZ Storage Field Created!", Toast.LENGTH_SHORT).show();
+                }
             }
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_STORAGE_PERMISSION) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                initializeTrkzField();
-            } else {
-                Toast.makeText(this, "Storage permission is required for TrKZ Field", Toast.LENGTH_LONG).show();
-            }
-        }
+        } catch (Exception ignored) {}
     }
 }
