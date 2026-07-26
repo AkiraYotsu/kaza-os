@@ -3,487 +3,255 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kaza OS v1.0 — Bare-Metal Microkernel Terminal</title>
-<meta name="description" content="Kaza OS — Bare-Metal Microkernel Operating System Console & Terminal Interface.">
+<title>Kaza OS v1.0 — Minimalist Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg-main:   #06080e;
-    --bg-panel:  #0d111a;
-    --border:    rgba(167, 139, 250, 0.2);
-    --text-main: #f1f5f9;
-    --text-muted:#64748b;
-    --accent:    #a78bfa;
-    --green:     #34d399;
-    --yellow:    #fbbf24;
-    --red:       #f87171;
-    --blue:      #60a5fa;
+    --bg-black:  #000000;
+    --text-white:#ffffff;
+    --green:     #00ff66;
+    --red:       #ff3333;
+    --muted:     #666666;
+    --border:    #222222;
     --font-mono: 'Fira Code', monospace;
   }
 
   body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg-main);
-    color: var(--text-main);
+    font-family: var(--font-mono);
+    background: var(--bg-black);
+    color: var(--text-white);
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
   }
 
-  /* --- BOOT SCREEN --- */
-  #boot-screen {
-    position: fixed; inset: 0; z-index: 999;
-    background: #020306;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 1.2rem;
-  }
-
-  .boot-logo {
-    font-family: var(--font-mono);
-    color: var(--accent);
-    font-size: clamp(0.65rem, 2vw, 0.85rem);
-    text-align: center;
-    line-height: 1.25;
-    white-space: pre;
-  }
-
-  .boot-bar-wrap {
-    width: min(300px, 80vw);
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    height: 4px;
-    overflow: hidden;
-  }
-
-  .boot-bar {
-    height: 100%;
-    background: var(--accent);
-    width: 0%;
-    transition: width 0.1s linear;
-  }
-
-  .boot-msg {
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    color: var(--green);
-    text-align: center;
-    min-height: 1.2em;
-  }
-
-  /* --- TOPBAR --- */
+  /* TOPBAR */
   #topbar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0.6rem 1rem;
-    background: var(--bg-panel);
+    background: #000000;
     border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 50;
     flex-shrink: 0;
   }
 
-  .logo-pill {
-    display: flex; align-items: center; gap: 0.6rem;
-  }
-
-  .logo-tag {
-    font-family: var(--font-mono);
+  .title-tag {
     font-weight: 700;
-    font-size: 0.85rem;
-    color: var(--accent);
-    background: rgba(167, 139, 250, 0.1);
-    padding: 0.2rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    color: var(--green);
+    letter-spacing: 1px;
   }
 
-  .logo-title { font-size: 0.9rem; font-weight: 600; letter-spacing: -0.2px; }
-  .logo-sub   { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); }
-
-  .status-badge {
-    display: flex; align-items: center; gap: 0.4rem;
-    background: rgba(52, 211, 153, 0.08);
-    border: 1px solid rgba(52, 211, 153, 0.25);
-    padding: 0.25rem 0.6rem;
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 0.7rem; font-weight: 600; color: var(--green);
+  .status-tag {
+    color: var(--green);
+    font-size: 0.75rem;
   }
 
-  .dot-online {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--green);
-  }
-
-  /* --- LAYOUT --- */
+  /* LAYOUT */
   #app {
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: calc(100dvh - 51px);
+    height: calc(100dvh - 45px);
     position: relative;
-  }
-
-  /* --- TERMINAL OUTPUT --- */
-  #terminal-wrap {
-    position: relative;
-    background: var(--bg-main);
-    flex: 1;
-    display: flex; flex-direction: column;
-    overflow: hidden;
   }
 
   #terminal-output {
     flex: 1;
     overflow-y: auto;
     padding: 1rem;
-    font-family: var(--font-mono);
-    font-size: clamp(0.72rem, 2.4vw, 0.85rem);
+    font-size: clamp(0.75rem, 2.4vw, 0.85rem);
     line-height: 1.6;
-    color: var(--accent);
-    scroll-behavior: smooth;
+    color: var(--text-white);
   }
 
-  #terminal-output::-webkit-scrollbar { width: 4px; }
-  #terminal-output::-webkit-scrollbar-thumb {
-    background: rgba(167, 139, 250, 0.2); border-radius: 2px;
-  }
+  #terminal-output::-webkit-scrollbar { width: 3px; }
+  #terminal-output::-webkit-scrollbar-thumb { background: #333333; }
 
-  .c-cyan   { color: var(--accent); }
-  .c-green  { color: var(--green); }
-  .c-yellow { color: var(--yellow); }
-  .c-red    { color: var(--red); }
-  .c-blue   { color: var(--blue); }
-  .c-white  { color: var(--text-main); }
-  .c-muted  { color: var(--text-muted); }
+  .c-green { color: var(--green); }
+  .c-red   { color: var(--red); }
+  .c-white { color: var(--text-white); }
+  .c-muted { color: var(--muted); }
 
-  /* --- SLASH COMMAND MENU POPUP --- */
+  /* SLASH POPUP */
   #slash-menu {
     display: none;
     position: absolute;
-    bottom: 52px;
-    left: 1rem; right: 1rem;
-    max-width: 480px;
-    background: #0f1422;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 -8px 24px rgba(0,0,0,0.6);
+    bottom: 50px; left: 1rem; right: 1rem;
+    max-width: 500px;
+    background: #0a0a0a;
+    border: 1px solid #333333;
     z-index: 100;
-    max-height: 240px;
+    max-height: 220px;
     overflow-y: auto;
   }
 
   #slash-menu.active { display: block; }
 
-  .slash-header {
-    padding: 0.4rem 0.8rem;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    background: rgba(255,255,255,0.02);
-  }
-
   .slash-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: 0.5rem 0.8rem;
-    font-family: var(--font-mono);
     font-size: 0.78rem;
     cursor: pointer;
-    border-bottom: 1px solid rgba(255,255,255,0.02);
-    transition: background 0.1s;
+    border-bottom: 1px solid #111111;
   }
 
   .slash-item:hover, .slash-item.selected {
-    background: rgba(167, 139, 250, 0.12);
+    background: #151515;
   }
 
-  .slash-cmd  { color: var(--accent); font-weight: 600; }
-  .slash-desc { color: var(--text-muted); font-size: 0.72rem; }
+  .slash-cmd  { color: var(--green); font-weight: 700; }
+  .slash-desc { color: var(--muted); font-size: 0.72rem; }
 
-  /* --- INPUT BAR --- */
+  /* INPUT BAR */
   #input-bar {
     position: relative; z-index: 10;
-    background: var(--bg-panel);
+    background: #000000;
     border-top: 1px solid var(--border);
     padding: 0.6rem 0.8rem;
     display: flex; align-items: center; gap: 0.5rem;
     flex-shrink: 0;
   }
 
-  .prompt-label {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    white-space: nowrap; flex-shrink: 0;
-  }
-
   #cmd-input {
     flex: 1;
     background: transparent;
     border: none; outline: none;
-    color: var(--text-main);
+    color: var(--text-white);
     font-family: var(--font-mono);
     font-size: 0.85rem;
-    caret-color: var(--accent);
+    caret-color: var(--green);
   }
 
   .btn-slash {
-    background: rgba(167, 139, 250, 0.1);
-    border: 1px solid var(--border);
-    color: var(--accent);
+    background: #0a0a0a;
+    border: 1px solid #333333;
+    color: var(--green);
     font-family: var(--font-mono);
-    font-size: 0.75rem; font-weight: 600;
-    padding: 0.35rem 0.6rem;
-    border-radius: 4px; cursor: pointer;
-    flex-shrink: 0;
+    font-size: 0.75rem; font-weight: 700;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
   }
 
-  .btn-slash:hover {
-    background: rgba(167, 139, 250, 0.2);
-  }
-
-  /* --- INFO DIALOG --- */
+  /* MODAL */
   #info-modal {
     display: none;
     position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.85);
     align-items: center; justify-content: center;
     padding: 1rem;
   }
   #info-modal.active { display: flex; }
 
   .modal-box {
-    background: #0f1422;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    width: min(520px, 95vw);
+    background: #050505;
+    border: 1px solid #333333;
+    width: min(560px, 95vw);
     max-height: 85dvh;
     overflow-y: auto;
     padding: 1.2rem;
-  }
-
-  .modal-title {
-    font-family: var(--font-mono);
-    font-size: 0.95rem; font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 1rem;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-
-  .modal-close {
-    background: transparent; border: none;
-    color: var(--text-muted); cursor: pointer;
-    font-family: var(--font-mono); font-size: 1rem;
-  }
-
-  .grid-2 {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
-    margin-bottom: 1rem;
-  }
-
-  .box-metric {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 4px; padding: 0.6rem;
-  }
-
-  .metric-label { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.2rem; }
-  .metric-value { font-family: var(--font-mono); font-size: 0.88rem; font-weight: 600; color: var(--accent); }
-
-  .code-block {
-    background: #06080e;
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 4px; padding: 0.8rem;
-    font-family: var(--font-mono); font-size: 0.75rem;
-    line-height: 1.8; color: var(--accent);
-    margin-top: 0.5rem;
   }
 </style>
 </head>
 <body>
 
-<!-- BOOT SCREEN -->
-<div id="boot-screen">
-  <pre class="boot-logo">
- _  __   _   ____    _      ___  ____
-| |/ /  / \ |_  /   / \    / _ \/ ___|
-| ' /  / _ \ / /   / _ \  | | | \___ \
-|_|\_/_/   \____|_/   \_\ \___/|____/
-
-      Bare-Metal Microkernel OS
-  </pre>
-  <div class="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
-  <div class="boot-msg" id="boot-msg">Initializing kernel...</div>
-</div>
-
-<!-- TOPBAR -->
 <div id="topbar">
-  <div class="logo-pill">
-    <div class="logo-tag">KZ</div>
-    <div>
-      <div class="logo-title">Kaza OS <span style="color:var(--text-muted);font-weight:400;font-size:0.75rem">v1.0</span></div>
-      <div class="logo-sub">Bare-Metal Microkernel Console</div>
-    </div>
-  </div>
-  <div style="display:flex;gap:0.5rem;align-items:center">
-    <div class="status-badge"><div class="dot-online"></div><span id="statusTxt">SYSTEM READY</span></div>
-    <button class="btn-slash" onclick="toggleModal()">[ System Info ]</button>
+  <div class="title-tag">KAZA OS v1.0</div>
+  <div style="display:flex;gap:0.6rem;align-items:center">
+    <div class="status-tag">[ KERNEL ACTIVE ]</div>
+    <button class="btn-slash" onclick="toggleModal()">[ TERMUX / INFO ]</button>
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
-  <div id="terminal-wrap">
-    <div id="terminal-output"></div>
+  <div id="terminal-output"></div>
 
-    <!-- SLASH MENU POPUP -->
-    <div id="slash-menu">
-      <div class="slash-header">AVAILABLE COMMANDS (Use ARROW KEYS or CLICK to select)</div>
-      <div id="slash-list"></div>
-    </div>
+  <!-- SLASH POPUP -->
+  <div id="slash-menu">
+    <div style="padding:0.4rem 0.8rem;font-size:0.7rem;color:var(--muted);border-bottom:1px solid #222;">COMMAND MENU (CLICK OR USE ARROWS + ENTER)</div>
+    <div id="slash-list"></div>
   </div>
 
-  <!-- INPUT BAR -->
   <div id="input-bar">
-    <span class="prompt-label">
-      <span class="c-green">kaza</span><span class="c-muted">@</span><span class="c-cyan">kernel</span><span class="c-muted">:~$</span>
+    <span style="font-size:0.8rem;white-space:nowrap">
+      <span class="c-green">kaza</span><span class="c-muted">@</span><span class="c-white">kernel</span><span class="c-muted">:~$</span>
     </span>
-    <input id="cmd-input" type="text" placeholder="Type a command or '/' for menu..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <input id="cmd-input" type="text" placeholder="Type command or '/' for menu..." autocomplete="off" autocorrect="off" spellcheck="false">
     <button class="btn-slash" onclick="toggleSlashMenu()">/</button>
   </div>
 </div>
 
-<!-- INFO MODAL -->
+<!-- MODAL -->
 <div id="info-modal">
   <div class="modal-box">
-    <div class="modal-title">
-      <span>SYSTEM DIAGNOSTICS</span>
-      <button class="modal-close" onclick="toggleModal()">[X]</button>
+    <div style="display:flex;justify-content:space-between;margin-bottom:1rem">
+      <span class="c-green" style="font-weight:700">TERMUX INSTALLATION & SYSTEM INFO</span>
+      <button class="btn-slash" onclick="toggleModal()">[X]</button>
     </div>
 
-    <div class="grid-2">
-      <div class="box-metric">
-        <div class="metric-label">Architecture</div>
-        <div class="metric-value">x86 IA-32</div>
+    <div style="font-size:0.78rem;line-height:1.6;color:var(--text-white)">
+      <div style="color:var(--green);font-weight:700;margin-bottom:0.4rem">HOW TO RUN KAZA OS IN TERMUX:</div>
+      1. Open Termux on your Android phone<br>
+      2. Run this quick command:<br>
+      <div style="background:#111;padding:0.6rem;border:1px solid #333;margin:0.4rem 0;color:var(--green)">
+        curl -sSL https://raw.githubusercontent.com/AkiraYotsu/kaza-os/main/install.sh | bash
       </div>
-      <div class="box-metric">
-        <div class="metric-label">Kernel Binary</div>
-        <div class="metric-value" id="mSize">18.36 KB</div>
-      </div>
-      <div class="box-metric">
-        <div class="metric-label">Heap Memory</div>
-        <div class="metric-value">16,384 KB</div>
-      </div>
-      <div class="box-metric">
-        <div class="metric-label">IDT Gates</div>
-        <div class="metric-value">256 Active</div>
-      </div>
-      <div class="box-metric">
-        <div class="metric-label">QEMU Monitor</div>
-        <div class="metric-value" id="mQemu" style="color:var(--green)">ACTIVE</div>
-      </div>
-      <div class="box-metric">
-        <div class="metric-label">Telemetry Mode</div>
-        <div class="metric-value" id="mMode">REAL-TIME</div>
-      </div>
-    </div>
+      3. Type <span class="c-green">kaza</span> anytime in Termux to launch Kaza OS shell layer!<br><br>
 
-    <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);margin-bottom:0.4rem;">KERNEL COMPONENT SUMMARY</div>
-    <div class="code-block">
-      boot.s     : 35 lines  (Multiboot Entry)<br>
-      vga.c      : 93 lines  (VGA Text Driver 0xB8000)<br>
-      keyboard.c : 59 lines  (PS/2 Input Driver)<br>
-      memory.c   : 39 lines  (Heap Allocator)<br>
-      shell.c    : 186 lines (Command Parser)<br>
-      kernel.c   : 58 lines  (kmain Entry Point)<br>
-      idt.c      : 48 lines  (Interrupt Descriptor Table)<br>
-      --------------------------------------------------<br>
-      TOTAL      : 673 lines bare-metal C & Assembly
+      <div style="color:var(--green);font-weight:700;margin-bottom:0.4rem">FEATURES:</div>
+      - File System Reading/Writing (<span class="c-green">li /path</span>, <span class="c-green">read</span>, <span class="c-green">write</span>)<br>
+      - Minimalist Black & White + Green Terminal Interface<br>
+      - Exact error reporting in <span class="c-red">RED</span> text if directories do not exist.
     </div>
   </div>
 </div>
 
 <script>
-// --- BOOT LOGIC ---
-const bootMsgs = [
-  'Initializing Kaza bootloader...',
-  'Loading kernel image [kaza.elf 18.36KB]...',
-  'Configuring GDT & IDT (256 gates)...',
-  'Initializing VGA driver (0xB8000)...',
-  'Connecting QEMU monitor socket...',
-  'Allocating memory heap (16MB)...',
-  'Initializing PS/2 keyboard controller...',
-  'Remapping PIC (IRQ0->0x20, IRQ8->0x28)...',
-  'Launching kernel console shell...',
-  'System ready.',
-];
-
-let bp = 0;
-function runBoot() {
-  if (bp >= bootMsgs.length) {
-    const bs = document.getElementById('boot-screen');
-    bs.style.transition = 'opacity 0.4s';
-    bs.style.opacity = '0';
-    setTimeout(() => { bs.style.display = 'none'; initConsole(); }, 400);
-    return;
-  }
-  document.getElementById('boot-bar').style.width = Math.round((bp / bootMsgs.length) * 100) + '%';
-  document.getElementById('boot-msg').textContent = bootMsgs[bp++];
-  setTimeout(runBoot, 200 + Math.random() * 120);
-}
-setTimeout(runBoot, 300);
-
-// --- TELEMETRY ---
-let realData = null;
-
-async function pollTelemetry() {
-  try {
-    const r = await fetch('/api/status');
-    if (r.ok) {
-      realData = await r.json();
-      document.getElementById('mSize').textContent = realData.kernel_binary_kb + ' KB';
-      document.getElementById('mQemu').textContent = realData.status.toUpperCase();
-      document.getElementById('mMode').textContent = 'REAL-TIME';
-      document.getElementById('statusTxt').textContent = 'QEMU LINKED';
-    }
-  } catch(e) {
-    document.getElementById('mMode').textContent = 'STATIC (PAGES)';
-    document.getElementById('mQemu').textContent = 'SIMULATED';
-  }
-}
-setInterval(pollTelemetry, 3000);
-
-// --- CONSOLE ENGINE ---
 const out = document.getElementById('terminal-output');
 const inp = document.getElementById('cmd-input');
 const slashMenu = document.getElementById('slash-menu');
 const slashList = document.getElementById('slash-list');
 
+// Virtual File System simulation for web console
+const vfs = {
+  "/root": [
+    { name: "kernel.c", type: "file", size: 1450 },
+    { name: "boot.s", type: "file", size: 554 },
+    { name: "vga.c", type: "file", size: 2100 },
+    { name: "keyboard.c", type: "file", size: 1400 },
+    { name: "memory.c", type: "file", size: 748 },
+    { name: "shell.c", type: "file", size: 5600 },
+    { name: "kaza_cli.c", type: "file", size: 3800 },
+    { name: "system.config", type: "file", size: 240 }
+  ],
+  "/system": [
+    { name: "bin", type: "dir" },
+    { name: "lib", type: "dir" },
+    { name: "drivers", type: "dir" }
+  ]
+};
+
+const fileContents = {
+  "/root/system.config": "OS_NAME=Kaza OS\nOS_VERSION=1.0\nARCH=x86/ARM64\nMODE=Bare-Metal/Userland",
+  "/root/kernel.c": "#include \"kernel.h\"\n\nvoid kmain() {\n    vga_init();\n    mem_init();\n    keyboard_init();\n}"
+};
+
 const commandDef = [
-  { cmd: 'fetch', desc: 'Display system architecture banner & specifications' },
-  { cmd: 'sysinfo', desc: 'Show hardware diagnostics, RAM usage, and IDT status' },
-  { cmd: 'memory', desc: 'Inspect heap memory allocation map & pointers' },
-  { cmd: 'about', desc: 'Architecture rationale & design comparisons' },
-  { cmd: 'howwork', desc: 'Step-by-step kernel execution sequence' },
-  { cmd: 'theme', desc: 'Change display color palette (theme 1-4)' },
-  { cmd: 'clear', desc: 'Clear the terminal output buffer' },
-  { cmd: 'halt', desc: 'Safely halt CPU execution state' }
+  { cmd: 'li /root', desc: 'List files in /root directory' },
+  { cmd: 'li /sdcard/download', desc: 'Inspect /sdcard/download (Tests error handling)' },
+  { cmd: 'read /root/system.config', desc: 'Read file content' },
+  { cmd: 'write /root/notes.txt Hello Kaza OS', desc: 'Write text to file' },
+  { cmd: 'sysinfo', desc: 'System environment status' },
+  { cmd: 'termux', desc: 'Show Termux installation command' },
+  { cmd: 'clear', desc: 'Clear terminal screen' },
+  { cmd: 'halt', desc: 'Halt system execution' }
 ];
 
 let selectedIndex = 0;
 
-function print(html) {
-  const d = document.createElement('div');
-  d.innerHTML = html;
-  out.appendChild(d);
-  out.scrollTop = out.scrollHeight;
-}
-
-function printRaw(text, cls = 'c-cyan') {
+function printRaw(text, cls = 'c-white') {
   text.split('\n').forEach(line => {
     const d = document.createElement('div');
     d.className = cls;
@@ -493,17 +261,10 @@ function printRaw(text, cls = 'c-cyan') {
   out.scrollTop = out.scrollHeight;
 }
 
-function nl() { print('<br>'); }
-
-function esc(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
 function printPrompt(cmd) {
-  print(`<span class="c-green">kaza</span><span class="c-muted">@</span><span class="c-cyan">kernel</span><span class="c-muted">:~$ </span><span class="c-white">${esc(cmd)}</span>`);
+  printRaw(`kaza@kernel:~$ ${cmd}`, 'c-green');
 }
 
-// --- SLASH MENU POPUP ---
 function renderSlashMenu(filter = '') {
   const q = filter.startsWith('/') ? filter.slice(1).toLowerCase() : filter.toLowerCase();
   const matches = commandDef.filter(c => c.cmd.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q));
@@ -542,104 +303,63 @@ function selectCommand(cmdName) {
   submitCmd();
 }
 
-// --- COMMAND IMPLEMENTATION ---
-const execCmd = {
-  fetch() {
-    nl();
-    const sz = realData ? realData.kernel_binary_kb : 18.36;
-    printRaw('     /\\      Kaza OS v1.0 (Bare-Metal Console)', 'c-cyan');
-    printRaw('    /  \\     ----------------------------------------', 'c-muted');
-    printRaw(`   / /\\ \\    OS Type   : Bare-Metal Microkernel`, 'c-cyan');
-    printRaw(`  / ____ \\   Arch      : x86 (32-bit Protected Mode)`, 'c-cyan');
-    printRaw(` /_/    \\_\\  Memory    : 16 MB Heap Allocated`, 'c-cyan');
-    printRaw(`             Binary    : kaza.elf [${sz} KB]`, 'c-cyan');
-    printRaw(`             Compiler  : Clang freestanding (i386-pc-none-elf)`, 'c-cyan');
-    printRaw(`             Status    : System Active 100%`, 'c-green');
-    nl();
-  },
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-  sysinfo() {
-    nl();
-    printRaw('--- System Health & Diagnostics ---', 'c-blue');
-    nl();
-    const sz = realData ? realData.kernel_binary_kb : 18.36;
-    const qSt = realData ? realData.raw_monitor : 'VM status: running';
-    printRaw(`  CPU Architecture : x86 IA-32 Protected Mode`, 'c-white');
-    printRaw(`  Kernel ELF Binary: kaza.elf (${sz} KB)`, 'c-white');
-    printRaw(`  Heap Memory      : 16,384 KB Total`, 'c-white');
-    printRaw(`  Used Heap        : 240 KB`, 'c-yellow');
-    printRaw(`  Free Heap        : 16,144 KB`, 'c-green');
-    printRaw(`  QEMU State       : ${qSt}`, 'c-green');
-    printRaw(`  IDT Interrupts   : 256 Vectors Registered`, 'c-green');
-    printRaw(`  VGA Buffer       : 0xB8000 (Text Mode 80x25)`, 'c-cyan');
-    printRaw(`  Panic Risk       : 0.00%`, 'c-green');
-    nl();
-  },
+function cmdLi(path) {
+  path = path.trim();
+  if (!path) path = "/root";
 
-  memory() {
-    nl();
-    printRaw('--- Heap Memory Allocation Map ---', 'c-blue');
-    nl();
-    printRaw('  Base Address : 0x01000000 (16 MB mark)', 'c-cyan');
-    printRaw('  Total Heap   : 16,384 KB', 'c-cyan');
-    nl();
-    printRaw('  Allocated Blocks:', 'c-muted');
-    printRaw('  0x01000000  kernel.c   58 B   Main entry point', 'c-white');
-    printRaw('  0x01000040  vga.c      120 B  VGA frame buffer state', 'c-white');
-    printRaw('  0x010000C0  shell.c    186 B  Console command parser', 'c-white');
-    printRaw('  0x01000180  memory.c   48 B   Allocator descriptor', 'c-white');
-    printRaw('  0x010001C0  (free)     16,143 KB Available space', 'c-green');
-    nl();
-  },
-
-  about() {
-    nl();
-    printRaw('--- Kaza OS System Rationale ---', 'c-green');
-    nl();
-    printRaw('1. Zero Overhead  : Built directly on bare-metal hardware without bloated layers.', 'c-white');
-    printRaw('2. Pure C + ASM   : Direct control over memory, interrupt vectors, and IO ports.', 'c-white');
-    printRaw('3. Microkernel    : Component isolation prevents system-wide panics.', 'c-white');
-    printRaw('4. Concise Code   : 673 lines of core logic vs millions in bloated OSes.', 'c-white');
-    nl();
-  },
-
-  howwork() {
-    nl();
-    printRaw('--- Execution Sequence ---', 'c-cyan');
-    nl();
-    printRaw('  1. CPU Power-On -> Read instructions from BIOS/UEFI ROM', 'c-white');
-    printRaw('  2. Bootloader   -> Load boot.s to 0x100000 in physical RAM', 'c-white');
-    printRaw('  3. Stack Setup  -> Configure ESP to 16KB stack boundary', 'c-white');
-    printRaw('  4. kmain Entry  -> Execute C entry point in kernel.c', 'c-white');
-    printRaw('  5. VGA Subsystem-> Initialize 0xB8000 text buffer', 'c-white');
-    printRaw('  6. Console Loop -> Polling PS/2 keyboard port 0x60', 'c-white');
-    nl();
-  },
-
-  clear() { out.innerHTML = ''; },
-
-  halt() {
-    nl();
-    printRaw('[KAZA KERNEL] Disabling interrupt vectors (CLI)...', 'c-yellow');
-    printRaw('[KAZA KERNEL] Halting CPU execution state (HLT)...', 'c-red');
-    printRaw('[SYSTEM HALTED]', 'c-red');
-    nl();
-  },
-
-  theme(arg) {
-    const t = {
-      '1': '#a78bfa', // Violet
-      '2': '#34d399', // Green
-      '3': '#fbbf24', // Yellow
-      '4': '#60a5fa', // Blue
-    }[arg];
-    if (!t) { printRaw('Usage: theme 1 | 2 | 3 | 4', 'c-red'); return; }
-    document.documentElement.style.setProperty('--accent', t);
-    nl();
-    printRaw(`Color scheme updated.`, 'c-green');
-    nl();
+  if (!vfs[path]) {
+    printRaw(`ERROR: Directory '${path}' not found or inaccessible.`, 'c-red');
+    return;
   }
-};
+
+  printRaw(`Directory listing for: ${path}`, 'c-green');
+  const items = vfs[path];
+  items.forEach(item => {
+    if (item.type === 'dir') {
+      printRaw(`[DIR]  ${item.name}/`, 'c-green');
+    } else {
+      printRaw(`[FILE] ${item.name} (${item.size} bytes)`, 'c-white');
+    }
+  });
+}
+
+function cmdRead(filepath) {
+  filepath = filepath.trim();
+  if (!filepath) {
+    printRaw("ERROR: Please specify a file path. Usage: read <filepath>", 'c-red');
+    return;
+  }
+  if (fileContents[filepath]) {
+    printRaw(`--- Content of ${filepath} ---`, 'c-green');
+    printRaw(fileContents[filepath], 'c-white');
+    printRaw(`--- End of file ---`, 'c-green');
+  } else {
+    printRaw(`ERROR: File '${filepath}' not found or cannot be opened.`, 'c-red');
+  }
+}
+
+function cmdWrite(filepathAndText) {
+  const parts = filepathAndText.trim().split(' ');
+  const path = parts[0];
+  const text = parts.slice(1).join(' ');
+
+  if (!path) {
+    printRaw("ERROR: Usage: write <filepath> <content>", 'c-red');
+    return;
+  }
+
+  fileContents[path] = text;
+  // Add to VFS root if not exists
+  if (!vfs["/root"].some(i => i.name === path.replace("/root/", ""))) {
+    vfs["/root"].push({ name: path.replace("/root/", ""), type: "file", size: text.length });
+  }
+
+  printRaw(`SUCCESS: Data written to '${path}'`, 'c-green');
+}
 
 function runCommand(rawInput) {
   let clean = rawInput.trim();
@@ -648,24 +368,31 @@ function runCommand(rawInput) {
 
   printPrompt(clean);
 
-  const parts = clean.split(' ');
-  const cmd = parts[0].toLowerCase();
-  const arg = parts[1] || '';
-
-  if (cmd === 'help') {
-    nl();
-    printRaw('Available Commands (type or press / for menu):', 'c-yellow');
+  if (clean.startsWith("li ") || clean === "li") {
+    const path = clean.length > 3 ? clean.slice(3) : "/root";
+    cmdLi(path);
+  } else if (clean.startsWith("read ")) {
+    cmdRead(clean.slice(5));
+  } else if (clean.startsWith("write ")) {
+    cmdWrite(clean.slice(6));
+  } else if (clean === "sysinfo") {
+    printRaw("--- Kaza OS Environment Info ---", 'c-green');
+    printRaw("Architecture : x86 Bare-Metal & ARM64 POSIX Layer", 'c-white');
+    printRaw("Status       : Active & Functioning", 'c-green');
+    printRaw("Memory       : Dynamic System Allocator", 'c-white');
+  } else if (clean === "termux") {
+    toggleModal();
+  } else if (clean === "clear") {
+    out.innerHTML = '';
+  } else if (clean === "halt") {
+    printRaw("[KAZA OS] System halted.", 'c-red');
+  } else if (clean === "help") {
+    printRaw("Available Commands:", 'c-green');
     commandDef.forEach(c => {
-      printRaw(`  ${c.cmd.padEnd(10)} - ${c.desc}`, 'c-cyan');
+      printRaw(`  ${c.cmd.padEnd(35)} - ${c.desc}`, 'c-white');
     });
-    nl();
-  } else if (execCmd[cmd]) {
-    execCmd[cmd](arg);
   } else {
-    nl();
-    printRaw(`kaza: command not found: ${cmd}`, 'c-red');
-    printRaw(`Type 'help' or '/' to view available commands.`, 'c-muted');
-    nl();
+    printRaw(`ERROR: Command '${clean}' not found. Type 'help' or '/' for command list.`, 'c-red');
   }
 }
 
@@ -676,7 +403,6 @@ function submitCmd() {
   runCommand(val);
 }
 
-// --- INPUT LISTENERS ---
 inp.addEventListener('input', (e) => {
   const val = e.target.value;
   if (val.startsWith('/') || val.length > 0) {
@@ -726,15 +452,16 @@ function toggleModal() {
 
 function initConsole() {
   out.innerHTML = '';
-  printRaw('====================================================', 'c-cyan');
-  printRaw('      KAZA OS v1.0 — Bare-Metal Microkernel Console', 'c-cyan');
-  printRaw('====================================================', 'c-cyan');
-  execCmd.fetch();
-  printRaw("Type 'help' or '/' to open command menu.", 'c-yellow');
-  nl();
+  printRaw("====================================================", 'c-green');
+  printRaw("     KAZA OS v1.0 — Minimalist Console              ", 'c-green');
+  printRaw("====================================================", 'c-green');
+  printRaw("Type 'help' or '/' to view available commands.", 'c-white');
+  printRaw("Try: li /root OR li /sdcard/download to test directory inspect.", 'c-muted');
+  printRaw("---", 'c-muted');
   inp.focus();
-  pollTelemetry();
 }
+
+initConsole();
 </script>
 </body>
 </html>
