@@ -19,13 +19,13 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle Runner
-      uses: gradle/actions/setup-gradle@v3
+    - name: Make Gradlew Executable
+      run: chmod +x trkz-app/gradlew
 
     - name: Build Debug APK
       run: |
         cd trkz-app
-        gradle assembleDebug --stacktrace || (chmod +x gradlew && ./gradlew assembleDebug --stacktrace)
+        ./gradlew assembleDebug --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4

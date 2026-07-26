@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 
-# Resolving links from $0 if necessary
+##############################################################################
+##
+##  Gradle start up script for UN*X
+##
+##############################################################################
+
 PRG="$0"
 while [ -h "$PRG" ] ; do
     ls=`ls -ld "$PRG"`
@@ -21,7 +26,7 @@ APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
 # Add default JVM options here.
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
