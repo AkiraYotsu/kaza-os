@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    namespace 'com.kazaos.trkz'
     compileSdk 33
 
     defaultConfig {
@@ -11,12 +12,6 @@ android {
         targetSdk 33
         versionCode 1
         versionName "1.1.0"
-
-        externalNativeBuild {
-            cmake {
-                cppFlags ""
-            }
-        }
     }
 
     buildTypes {
@@ -25,11 +20,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    externalNativeBuild {
-        cmake {
-            path "src/main/jni/CMakeLists.txt"
-            version "3.10.2"
-        }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 }
 
