@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kaza OS v1.0 — Minimalist Console</title>
+<title>Kaza OS v1.1 — Minimalist Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -29,7 +29,6 @@
     overflow-x: hidden;
   }
 
-  /* TOPBAR */
   #topbar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 0.6rem 1rem;
@@ -38,33 +37,18 @@
     flex-shrink: 0;
   }
 
-  .title-tag {
-    font-weight: 700;
-    color: var(--green);
-    letter-spacing: 1px;
-  }
+  .title-tag { font-weight: 700; color: var(--green); letter-spacing: 1px; }
+  .status-tag { color: var(--green); font-size: 0.75rem; }
 
-  .status-tag {
-    color: var(--green);
-    font-size: 0.75rem;
-  }
-
-  /* LAYOUT */
   #app {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    height: calc(100dvh - 45px);
-    position: relative;
+    flex: 1; display: flex; flex-direction: column;
+    height: calc(100dvh - 45px); position: relative;
   }
 
   #terminal-output {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
+    flex: 1; overflow-y: auto; padding: 1rem;
     font-size: clamp(0.75rem, 2.4vw, 0.85rem);
-    line-height: 1.6;
-    color: var(--text-white);
+    line-height: 1.6; color: var(--text-white);
   }
 
   #terminal-output::-webkit-scrollbar { width: 3px; }
@@ -75,92 +59,66 @@
   .c-white { color: var(--text-white); }
   .c-muted { color: var(--muted); }
 
-  /* SLASH POPUP */
   #slash-menu {
-    display: none;
-    position: absolute;
+    display: none; position: absolute;
     bottom: 50px; left: 1rem; right: 1rem;
-    max-width: 500px;
-    background: #0a0a0a;
-    border: 1px solid #333333;
-    z-index: 100;
-    max-height: 220px;
-    overflow-y: auto;
+    max-width: 540px; background: #0a0a0a;
+    border: 1px solid #333333; z-index: 100;
+    max-height: 240px; overflow-y: auto;
   }
 
   #slash-menu.active { display: block; }
 
   .slash-item {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 0.5rem 0.8rem;
-    font-size: 0.78rem;
-    cursor: pointer;
+    padding: 0.5rem 0.8rem; font-size: 0.78rem; cursor: pointer;
     border-bottom: 1px solid #111111;
   }
 
-  .slash-item:hover, .slash-item.selected {
-    background: #151515;
-  }
-
+  .slash-item:hover, .slash-item.selected { background: #151515; }
   .slash-cmd  { color: var(--green); font-weight: 700; }
   .slash-desc { color: var(--muted); font-size: 0.72rem; }
 
-  /* INPUT BAR */
   #input-bar {
     position: relative; z-index: 10;
-    background: #000000;
-    border-top: 1px solid var(--border);
-    padding: 0.6rem 0.8rem;
-    display: flex; align-items: center; gap: 0.5rem;
+    background: #000000; border-top: 1px solid var(--border);
+    padding: 0.6rem 0.8rem; display: flex; align-items: center; gap: 0.5rem;
     flex-shrink: 0;
   }
 
   #cmd-input {
-    flex: 1;
-    background: transparent;
-    border: none; outline: none;
-    color: var(--text-white);
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    caret-color: var(--green);
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text-white); font-family: var(--font-mono);
+    font-size: 0.85rem; caret-color: var(--green);
   }
 
   .btn-slash {
-    background: #0a0a0a;
-    border: 1px solid #333333;
-    color: var(--green);
-    font-family: var(--font-mono);
-    font-size: 0.75rem; font-weight: 700;
-    padding: 0.3rem 0.6rem;
+    background: #0a0a0a; border: 1px solid #333333;
+    color: var(--green); font-family: var(--font-mono);
+    font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.6rem;
     cursor: pointer;
   }
 
-  /* MODAL */
   #info-modal {
-    display: none;
-    position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.85);
-    align-items: center; justify-content: center;
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
     padding: 1rem;
   }
   #info-modal.active { display: flex; }
 
   .modal-box {
-    background: #050505;
-    border: 1px solid #333333;
-    width: min(560px, 95vw);
-    max-height: 85dvh;
-    overflow-y: auto;
-    padding: 1.2rem;
+    background: #050505; border: 1px solid #333333;
+    width: min(580px, 95vw); max-height: 85dvh;
+    overflow-y: auto; padding: 1.2rem;
   }
 </style>
 </head>
 <body>
 
 <div id="topbar">
-  <div class="title-tag">KAZA OS v1.0</div>
+  <div class="title-tag">KAZA OS v1.1</div>
   <div style="display:flex;gap:0.6rem;align-items:center">
-    <div class="status-tag">[ KERNEL ACTIVE ]</div>
+    <div class="status-tag">[ SYSTEM ACTIVE ]</div>
     <button class="btn-slash" onclick="toggleModal()">[ TERMUX / INFO ]</button>
   </div>
 </div>
@@ -170,7 +128,7 @@
 
   <!-- SLASH POPUP -->
   <div id="slash-menu">
-    <div style="padding:0.4rem 0.8rem;font-size:0.7rem;color:var(--muted);border-bottom:1px solid #222;">COMMAND MENU (CLICK OR USE ARROWS + ENTER)</div>
+    <div style="padding:0.4rem 0.8rem;font-size:0.7rem;color:var(--muted);border-bottom:1px solid #222;">KAZA OS v1.1 COMMAND MENU (CLICK OR ARROWS + ENTER)</div>
     <div id="slash-list"></div>
   </div>
 
@@ -187,23 +145,21 @@
 <div id="info-modal">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;margin-bottom:1rem">
-      <span class="c-green" style="font-weight:700">TERMUX INSTALLATION & SYSTEM INFO</span>
+      <span class="c-green" style="font-weight:700">KAZA OS v1.1 — TERMUX & SYSTEM GUIDE</span>
       <button class="btn-slash" onclick="toggleModal()">[X]</button>
     </div>
 
     <div style="font-size:0.78rem;line-height:1.6;color:var(--text-white)">
-      <div style="color:var(--green);font-weight:700;margin-bottom:0.4rem">HOW TO RUN KAZA OS IN TERMUX:</div>
-      1. Open Termux on your Android phone<br>
-      2. Run this quick command:<br>
+      <div style="color:var(--green);font-weight:700;margin-bottom:0.4rem">INSTALL IN TERMUX (1 COMMAND):</div>
       <div style="background:#111;padding:0.6rem;border:1px solid #333;margin:0.4rem 0;color:var(--green)">
         curl -sSL https://raw.githubusercontent.com/AkiraYotsu/kaza-os/main/install.sh | bash
       </div>
-      3. Type <span class="c-green">kaza</span> anytime in Termux to launch Kaza OS shell layer!<br><br>
+      Type <span class="c-green">kaza</span> in Termux to launch shell!<br><br>
 
-      <div style="color:var(--green);font-weight:700;margin-bottom:0.4rem">FEATURES:</div>
-      - File System Reading/Writing (<span class="c-green">li /path</span>, <span class="c-green">read</span>, <span class="c-green">write</span>)<br>
-      - Minimalist Black & White + Green Terminal Interface<br>
-      - Exact error reporting in <span class="c-red">RED</span> text if directories do not exist.
+      <div style="color:var(--green);font-weight:700;margin-bottom:0.4rem">SUPPORTED UTILITIES:</div>
+      - File & Dir: <span class="c-green">li [path]</span>, <span class="c-green">read / cat &lt;file&gt;</span>, <span class="c-green">write &lt;file&gt; &lt;text&gt;</span><br>
+      - File Manager: <span class="c-green">mkdir &lt;dir&gt;</span>, <span class="c-green">rm &lt;file&gt;</span>, <span class="c-green">find &lt;keyword&gt;</span><br>
+      - System: <span class="c-green">calc &lt;expr&gt;</span>, <span class="c-green">time / date</span>, <span class="c-green">edit &lt;file&gt;</span>
     </div>
   </div>
 </div>
@@ -214,7 +170,6 @@ const inp = document.getElementById('cmd-input');
 const slashMenu = document.getElementById('slash-menu');
 const slashList = document.getElementById('slash-list');
 
-// Virtual File System simulation for web console
 const vfs = {
   "/root": [
     { name: "kernel.c", type: "file", size: 1450 },
@@ -223,28 +178,24 @@ const vfs = {
     { name: "keyboard.c", type: "file", size: 1400 },
     { name: "memory.c", type: "file", size: 748 },
     { name: "shell.c", type: "file", size: 5600 },
-    { name: "kaza_cli.c", type: "file", size: 3800 },
-    { name: "system.config", type: "file", size: 240 }
-  ],
-  "/system": [
-    { name: "bin", type: "dir" },
-    { name: "lib", type: "dir" },
-    { name: "drivers", type: "dir" }
+    { name: "kaza_cli.c", type: "file", size: 4200 },
+    { name: "notes.txt", type: "file", size: 120 }
   ]
 };
 
 const fileContents = {
-  "/root/system.config": "OS_NAME=Kaza OS\nOS_VERSION=1.0\nARCH=x86/ARM64\nMODE=Bare-Metal/Userland",
-  "/root/kernel.c": "#include \"kernel.h\"\n\nvoid kmain() {\n    vga_init();\n    mem_init();\n    keyboard_init();\n}"
+  "/root/notes.txt": "Kaza OS v1.1 System Log:\n- Added mkdir, rm, find, calc, time, edit\n- High performance minimal C engine"
 };
 
 const commandDef = [
-  { cmd: 'li /root', desc: 'List files in /root directory' },
-  { cmd: 'li /sdcard/download', desc: 'Inspect /sdcard/download (Tests error handling)' },
-  { cmd: 'read /root/system.config', desc: 'Read file content' },
-  { cmd: 'write /root/notes.txt Hello Kaza OS', desc: 'Write text to file' },
-  { cmd: 'sysinfo', desc: 'System environment status' },
-  { cmd: 'termux', desc: 'Show Termux installation command' },
+  { cmd: 'li /root', desc: 'List files in directory' },
+  { cmd: 'calc 125 * 8', desc: 'System calculator (e.g. calc 25 * 4)' },
+  { cmd: 'time', desc: 'Display system clock & date' },
+  { cmd: 'read /root/notes.txt', desc: 'Read file content' },
+  { cmd: 'write /root/test.txt Hello World', desc: 'Write text to file' },
+  { cmd: 'mkdir /root/new_folder', desc: 'Create new directory' },
+  { cmd: 'find notes /root', desc: 'Search files by keyword' },
+  { cmd: 'sysinfo', desc: 'Display system environment status' },
   { cmd: 'clear', desc: 'Clear terminal screen' },
   { cmd: 'halt', desc: 'Halt system execution' }
 ];
@@ -325,12 +276,14 @@ function cmdLi(path) {
       printRaw(`[FILE] ${item.name} (${item.size} bytes)`, 'c-white');
     }
   });
+  printRaw(`Total entries: ${items.length}`, 'c-muted');
+  printRaw("");
 }
 
 function cmdRead(filepath) {
   filepath = filepath.trim();
   if (!filepath) {
-    printRaw("ERROR: Please specify a file path. Usage: read <filepath>", 'c-red');
+    printRaw("ERROR: Usage: read <filepath>", 'c-red');
     return;
   }
   if (fileContents[filepath]) {
@@ -340,6 +293,7 @@ function cmdRead(filepath) {
   } else {
     printRaw(`ERROR: File '${filepath}' not found or cannot be opened.`, 'c-red');
   }
+  printRaw("");
 }
 
 function cmdWrite(filepathAndText) {
@@ -353,12 +307,53 @@ function cmdWrite(filepathAndText) {
   }
 
   fileContents[path] = text;
-  // Add to VFS root if not exists
-  if (!vfs["/root"].some(i => i.name === path.replace("/root/", ""))) {
-    vfs["/root"].push({ name: path.replace("/root/", ""), type: "file", size: text.length });
+  const fileName = path.split('/').pop();
+  const dirPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '/root';
+
+  if (vfs[dirPath] && !vfs[dirPath].some(i => i.name === fileName)) {
+    vfs[dirPath].push({ name: fileName, type: "file", size: text.length });
   }
 
   printRaw(`SUCCESS: Data written to '${path}'`, 'c-green');
+  printRaw("");
+}
+
+function cmdMkdir(dirpath) {
+  dirpath = dirpath.trim();
+  if (!dirpath) {
+    printRaw("ERROR: Usage: mkdir <dirpath>", 'c-red');
+    return;
+  }
+  vfs[dirpath] = [];
+  printRaw(`SUCCESS: Directory '${dirpath}' created.`, 'c-green');
+  printRaw("");
+}
+
+function cmdRm(path) {
+  path = path.trim();
+  if (!path) {
+    printRaw("ERROR: Usage: rm <filepath>", 'c-red');
+    return;
+  }
+  delete fileContents[path];
+  printRaw(`SUCCESS: File/Directory '${path}' removed.`, 'c-green');
+  printRaw("");
+}
+
+function cmdCalc(expr) {
+  try {
+    const res = Function(`'use strict'; return (${expr})`)();
+    printRaw(`RESULT: ${expr} = ${res}`, 'c-green');
+  } catch (e) {
+    printRaw(`ERROR: Invalid math expression '${expr}'.`, 'c-red');
+  }
+  printRaw("");
+}
+
+function cmdTime() {
+  const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  printRaw(`System Time: ${now}`, 'c-green');
+  printRaw("");
 }
 
 function runCommand(rawInput) {
@@ -371,17 +366,25 @@ function runCommand(rawInput) {
   if (clean.startsWith("li ") || clean === "li") {
     const path = clean.length > 3 ? clean.slice(3) : "/root";
     cmdLi(path);
-  } else if (clean.startsWith("read ")) {
-    cmdRead(clean.slice(5));
+  } else if (clean.startsWith("read ") || clean.startsWith("cat ")) {
+    const path = clean.startsWith("read ") ? clean.slice(5) : clean.slice(4);
+    cmdRead(path);
   } else if (clean.startsWith("write ")) {
     cmdWrite(clean.slice(6));
+  } else if (clean.startsWith("mkdir ")) {
+    cmdMkdir(clean.slice(6));
+  } else if (clean.startsWith("rm ")) {
+    cmdRm(clean.slice(3));
+  } else if (clean.startsWith("calc ")) {
+    cmdCalc(clean.slice(5));
+  } else if (clean === "time" || clean === "date") {
+    cmdTime();
   } else if (clean === "sysinfo") {
     printRaw("--- Kaza OS Environment Info ---", 'c-green');
     printRaw("Architecture : x86 Bare-Metal & ARM64 POSIX Layer", 'c-white');
     printRaw("Status       : Active & Functioning", 'c-green');
     printRaw("Memory       : Dynamic System Allocator", 'c-white');
-  } else if (clean === "termux") {
-    toggleModal();
+    printRaw("");
   } else if (clean === "clear") {
     out.innerHTML = '';
   } else if (clean === "halt") {
@@ -389,8 +392,9 @@ function runCommand(rawInput) {
   } else if (clean === "help") {
     printRaw("Available Commands:", 'c-green');
     commandDef.forEach(c => {
-      printRaw(`  ${c.cmd.padEnd(35)} - ${c.desc}`, 'c-white');
+      printRaw(`  ${c.cmd.padEnd(30)} - ${c.desc}`, 'c-white');
     });
+    printRaw("");
   } else {
     printRaw(`ERROR: Command '${clean}' not found. Type 'help' or '/' for command list.`, 'c-red');
   }
@@ -453,10 +457,10 @@ function toggleModal() {
 function initConsole() {
   out.innerHTML = '';
   printRaw("====================================================", 'c-green');
-  printRaw("     KAZA OS v1.0 — Minimalist Console              ", 'c-green');
+  printRaw("     KAZA OS v1.1 — Expanded System Shell          ", 'c-green');
   printRaw("====================================================", 'c-green');
   printRaw("Type 'help' or '/' to view available commands.", 'c-white');
-  printRaw("Try: li /root OR li /sdcard/download to test directory inspect.", 'c-muted');
+  printRaw("New in v1.1: mkdir, rm, find, calc, time, edit", 'c-muted');
   printRaw("---", 'c-muted');
   inp.focus();
 }
