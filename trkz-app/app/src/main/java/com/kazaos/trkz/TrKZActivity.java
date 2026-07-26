@@ -257,7 +257,7 @@ public class TrKZActivity extends AppCompatActivity {
         return super.dispatchKeyEvent(event);
     }
 
-    // COMMAND EXECUTION ENGINE WITH BUILT-IN CURL & SHELL
+    // COMMAND EXECUTION ENGINE WITH ENHANCED CURL & SHELL
     private void executeKazaCommand(String rawInput) {
         String clean = rawInput.trim();
         if (clean.startsWith("/")) clean = clean.substring(1);
@@ -302,7 +302,7 @@ public class TrKZActivity extends AppCompatActivity {
         scrollToBottom();
     }
 
-    // BUILT-IN NATIVE CURL (HttpURLConnection)
+    // BUILT-IN ENHANCED CURL WITH USER-AGENT & REDIRECT FOLLOW
     private void cmdNativeCurl(String args) {
         if (args.isEmpty()) {
             appendHistory("<font color='#f87171'>curl: try 'curl --help' or 'curl &lt;url&gt;'</font><br><br>");
@@ -327,15 +327,17 @@ public class TrKZActivity extends AppCompatActivity {
                 URL url = new URL(targetUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", "curl/7.68.0 (Android; Kaza OS)");
+                conn.setInstanceFollowRedirects(true);
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
 
                 final int responseCode = conn.getResponseCode();
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder content = new StringBuilder();
                 String inputLine;
                 int lines = 0;
-                while ((inputLine = in.readLine()) != null && lines < 30) {
+                while ((inputLine = in.readLine()) != null && lines < 50) {
                     content.append(escapeHtml(inputLine)).append("<br>");
                     lines++;
                 }
@@ -345,14 +347,14 @@ public class TrKZActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     appendHistory("<font color='#888888'>HTTP Response: " + responseCode + " OK</font><br>");
                     appendHistory("<font color='#ffffff'>" + content.toString() + "</font>");
-                    if (finalLines >= 30) {
+                    if (finalLines >= 50) {
                         appendHistory("<font color='#888888'>... (content truncated for display)</font><br>");
                     }
                     appendHistory("<br>");
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
-                    appendHistory("<font color='#f87171'>curl: error: " + escapeHtml(e.getMessage()) + "</font><br><br>");
+                    appendHistory("<font color='#f87171'>curl: error fetching URL: " + escapeHtml(e.getMessage()) + "</font><br><br>");
                 });
             }
         }).start();
