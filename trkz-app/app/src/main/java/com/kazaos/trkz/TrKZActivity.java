@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,7 +12,6 @@ import android.os.Environment;
 import android.provider.Settings;
 import android.text.Html;
 import android.text.Spanned;
-import android.util.DisplayMetrics;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -47,8 +47,11 @@ public class TrKZActivity extends AppCompatActivity {
     private ScrollView scrollConsole;
     private TextView txtSessionTag;
     private Button btnNewSession;
+    private Button btnCtrl;
     private float currentTextSizeSp = 13.0f;
     private ScaleGestureDetector scaleGestureDetector;
+
+    private boolean isCtrlActive = false;
 
     // Multi-Session Management
     private static class Session {
@@ -56,6 +59,8 @@ public class TrKZActivity extends AppCompatActivity {
         String name;
         File currentDir;
         StringBuilder historyBuffer = new StringBuilder();
+        List<String> cmdHistory = new ArrayList<>();
+        int historyIndex = -1;
 
         Session(int id, File initialDir) {
             this.id = id;
@@ -77,6 +82,7 @@ public class TrKZActivity extends AppCompatActivity {
         scrollConsole = findViewById(R.id.scrollConsole);
         txtSessionTag = findViewById(R.id.txtSessionTag);
         btnNewSession = findViewById(R.id.btnNewSession);
+        btnCtrl = findViewById(R.id.keyCtrl);
 
         // Initialize Session 1
         File defaultHome = getTrkzStorageDir();
@@ -179,6 +185,9 @@ public class TrKZActivity extends AppCompatActivity {
         if (clean.isEmpty()) return;
 
         Session s = getActiveSession();
+        s.cmdHistory.add(clean);
+        s.historyIndex = s.cmdHistory.size();
+
         appendHtml("<font color='#34d399'>kaza@kernel:~$ </font><font color='#ffffff'>" + escapeHtml(clean) + "</font><br>");
 
         String[] parts = clean.split("\\s+", 2);
@@ -225,6 +234,13 @@ public class TrKZActivity extends AppCompatActivity {
             appendHtml("<font color='#f87171'>kaza: command not found: " + escapeHtml(clean) + "</font><br><br>");
         }
 
+        // Reset CTRL state if it was active
+        if (isCtrlActive) {
+            isCtrlActive = false;
+            btnCtrl.setBackgroundColor(Color.parseColor("#181818"));
+            btnCtrl.setTextColor(Color.parseColor("#FFFFFF"));
+        }
+
         scrollToBottom();
     }
 
@@ -258,18 +274,18 @@ public class TrKZActivity extends AppCompatActivity {
             for (File f : files) {
                 count++;
                 if (f.isDirectory()) {
-                    // Folders in BLUE
-                    appendHtml("<font color='#60a5fa'><b>" + escapeHtml(f.getName()) + "/</b></font>  ");
+                    // Vertical line-by-line directory listing in BLUE
+                    appendHtml("<font color='#60a5fa'><b>[DIR]  " + escapeHtml(f.getName()) + "/</b></font><br>");
                 } else if (f.canExecute() || f.getName().endsWith(".sh")) {
                     // Executables in GREEN
-                    appendHtml("<font color='#34d399'>" + escapeHtml(f.getName()) + "</font>  ");
+                    appendHtml("<font color='#34d399'>[EXEC] " + escapeHtml(f.getName()) + "</font><br>");
                 } else {
-                    // Regular files in WHITE
-                    appendHtml("<font color='#ffffff'>" + escapeHtml(f.getName()) + "</font>  ");
+                    // Regular files in WHITE with size in GRAY
+                    appendHtml("<font color='#ffffff'>[FILE] " + escapeHtml(f.getName()) + "</font> <font color='#888888'>(" + f.length() + " B)</font><br>");
                 }
             }
         }
-        appendHtml("<br><font color='#888888'>Total entries: " + count + "</font><br><br>");
+        appendHtml("<font color='#888888'>Total entries: " + count + "</font><br><br>");
     }
 
     private void cmdRead(Session s, String filepath) {
@@ -370,7 +386,7 @@ public class TrKZActivity extends AppCompatActivity {
 
     private void cmdCalc(String expr) {
         if (expr.isEmpty()) {
-            appendHtml("<font color='#f87171'>calc: missing expression (e.g. calc 25 * 4)</font><br><br>");
+            appendHtml("<font color='#f87171'>calc: missing expression</font><br><br>");
             return;
         }
         try {
@@ -435,8 +451,8 @@ public class TrKZActivity extends AppCompatActivity {
     private void cmdHelp() {
         appendHtml("<font color='#888888'>Commands:</font><br>");
         appendHtml("<font color='#ffffff'>  pwd               - Print working directory</font><br>");
-        appendHtml("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory (e.g. cd /sdcard/Download)</font><br>");
-        appendHtml("<font color='#ffffff'>  ls / li [path]    - List files (Directories in BLUE)</font><br>");
+        appendHtml("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory</font><br>");
+        appendHtml("<font color='#ffffff'>  ls / li [path]    - List files vertically (Folders in BLUE)</font><br>");
         appendHtml("<font color='#ffffff'>  read / cat &lt;file&gt;  - Read text file</font><br>");
         appendHtml("<font color='#ffffff'>  write &lt;file&gt; &lt;txt&gt; - Append text to file</font><br>");
         appendHtml("<font color='#ffffff'>  mkdir / rm        - Create or remove files/folders</font><br>");
@@ -493,17 +509,71 @@ public class TrKZActivity extends AppCompatActivity {
     }
 
     private void setupExtraKeys() {
-        findViewById(R.id.keyCtrl).setOnClickListener(v -> insertText("^"));
+        // Toggle CTRL key
+        btnCtrl.setOnClickListener(v -> {
+            isCtrlActive = !isCtrlActive;
+            if (isCtrlActive) {
+                btnCtrl.setBackgroundColor(Color.parseColor("#3B82F6")); // BLUE when active
+                btnCtrl.setTextColor(Color.parseColor("#FFFFFF"));
+            } else {
+                btnCtrl.setBackgroundColor(Color.parseColor("#181818")); // Dark default
+                btnCtrl.setTextColor(Color.parseColor("#FFFFFF"));
+            }
+        });
+
         findViewById(R.id.keySlash).setOnClickListener(v -> insertText("/"));
         findViewById(R.id.keyTab).setOnClickListener(v -> insertText("  "));
-        findViewById(R.id.keyEsc).setOnClickListener(v -> edtCommand.setText(""));
+        
+        // ESC key: Clears current line and resets CTRL
+        findViewById(R.id.keyEsc).setOnClickListener(v -> {
+            edtCommand.setText("");
+            if (isCtrlActive) {
+                isCtrlActive = false;
+                btnCtrl.setBackgroundColor(Color.parseColor("#181818"));
+                btnCtrl.setTextColor(Color.parseColor("#FFFFFF"));
+            }
+        });
+
         findViewById(R.id.keyHome).setOnClickListener(v -> executeKazaCommand("cd ~"));
-        findViewById(R.id.keyUp).setOnClickListener(v -> insertText("▲"));
-        findViewById(R.id.keyDown).setOnClickListener(v -> insertText("▼"));
-        findViewById(R.id.keyLeft).setOnClickListener(v -> insertText("◄"));
-        findViewById(R.id.keyRight).setOnClickListener(v -> insertText("►"));
+
+        // UP key: Previous command in history
+        findViewById(R.id.keyUp).setOnClickListener(v -> navigateHistory(-1));
+
+        // DOWN key: Next command in history
+        findViewById(R.id.keyDown).setOnClickListener(v -> navigateHistory(1));
+
+        // LEFT key: Move cursor left
+        findViewById(R.id.keyLeft).setOnClickListener(v -> moveCursor(-1));
+
+        // RIGHT key: Move cursor right
+        findViewById(R.id.keyRight).setOnClickListener(v -> moveCursor(1));
+
         findViewById(R.id.keyPgUp).setOnClickListener(v -> scrollConsole.pageScroll(View.FOCUS_UP));
         findViewById(R.id.keyPgDn).setOnClickListener(v -> scrollConsole.pageScroll(View.FOCUS_DOWN));
+    }
+
+    private void navigateHistory(int direction) {
+        Session s = getActiveSession();
+        if (s.cmdHistory.isEmpty()) return;
+
+        s.historyIndex += direction;
+        if (s.historyIndex < 0) s.historyIndex = 0;
+        if (s.historyIndex >= s.cmdHistory.size()) {
+            s.historyIndex = s.cmdHistory.size();
+            edtCommand.setText("");
+            return;
+        }
+
+        String historicalCmd = s.cmdHistory.get(s.historyIndex);
+        edtCommand.setText(historicalCmd);
+        edtCommand.setSelection(historicalCmd.length());
+    }
+
+    private void moveCursor(int offset) {
+        int pos = edtCommand.getSelectionStart() + offset;
+        if (pos < 0) pos = 0;
+        if (pos > edtCommand.length()) pos = edtCommand.length();
+        edtCommand.setSelection(pos);
     }
 
     private void insertText(String str) {

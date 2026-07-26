@@ -4,7 +4,6 @@
     android:versionCode="1"
     android:versionName="1.1.0">
 
-    <!-- Storage & System Permissions for TrKZ Field -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
@@ -12,7 +11,8 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="TrKZ"
         android:requestLegacyExternalStorage="true"
         android:supportsRtl="true"

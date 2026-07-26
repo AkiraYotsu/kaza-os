@@ -11,8 +11,8 @@
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:background="#0a0a0a"
+        android:layout_height="34dp"
+        android:background="#050505"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
         android:gravity="center_vertical"
@@ -26,7 +26,7 @@
             android:textColor="#ffffff"
             android:textStyle="bold"
             android:fontFamily="monospace"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/txtSessionTag"
@@ -34,20 +34,20 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="  [Session 1]"
-            android:textColor="#888888"
+            android:textColor="#777777"
             android:fontFamily="monospace"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/btnNewSession"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
+            android:layout_height="26dp"
             android:background="#151515"
             android:text="+ Session"
             android:textColor="#60a5fa"
             android:fontFamily="monospace"
-            android:textSize="11sp"
-            android:paddingHorizontal="8dp"
+            android:textSize="10sp"
+            android:paddingHorizontal="6dp"
             android:minWidth="0dp"
             android:minHeight="0dp" />
     </LinearLayout>
@@ -56,10 +56,10 @@
         android:id="@+id/topDivider"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#222222"
+        android:background="#1a1a1a"
         android:layout_below="@id/topBar" />
 
-    <!-- Terminal Display (Pinch to Zoom Enabled) -->
+    <!-- Terminal Display (Text Selectable Enabled + Pinch Zoom) -->
     <ScrollView
         android:id="@+id/scrollConsole"
         android:layout_width="match_parent"
@@ -67,7 +67,7 @@
         android:layout_below="@id/topDivider"
         android:layout_above="@+id/extraKeysScroll"
         android:fillViewport="true"
-        android:padding="8dp">
+        android:padding="6dp">
 
         <TextView
             android:id="@+id/txtConsole"
@@ -76,15 +76,17 @@
             android:textColor="#ffffff"
             android:fontFamily="monospace"
             android:textSize="13sp"
-            android:lineSpacingExtra="2dp" />
+            android:lineSpacingExtra="2dp"
+            android:textIsSelectable="true"
+            android:linksClickable="true" />
     </ScrollView>
 
     <!-- Termux-style Extra Key Row -->
     <HorizontalScrollView
         android:id="@+id/extraKeysScroll"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:background="#0d0d0d"
+        android:layout_height="34dp"
+        android:background="#0a0a0a"
         android:layout_above="@+id/inputLayout"
         android:scrollbars="none">
 
@@ -96,21 +98,21 @@
             android:paddingHorizontal="4dp"
             android:gravity="center_vertical">
 
-            <Button android:id="@+id/keyCtrl" android:layout_width="48dp" android:layout_height="28dp" android:text="CTRL" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keySlash" android:layout_width="40dp" android:layout_height="28dp" android:text="/" android:textColor="#60a5fa" android:textSize="12sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyTab" android:layout_width="44dp" android:layout_height="28dp" android:text="TAB" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyEsc" android:layout_width="44dp" android:layout_height="28dp" android:text="ESC" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyHome" android:layout_width="48dp" android:layout_height="28dp" android:text="HOME" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyUp" android:layout_width="38dp" android:layout_height="28dp" android:text="▲" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyDown" android:layout_width="38dp" android:layout_height="28dp" android:text="▼" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyLeft" android:layout_width="38dp" android:layout_height="28dp" android:text="◄" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyRight" android:layout_width="38dp" android:layout_height="28dp" android:text="►" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyPgUp" android:layout_width="48dp" android:layout_height="28dp" android:text="PGUP" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
-            <Button android:id="@+id/keyPgDn" android:layout_width="48dp" android:layout_height="28dp" android:text="PGDN" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" />
+            <Button android:id="@+id/keyCtrl" android:layout_width="48dp" android:layout_height="26dp" android:text="CTRL" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keySlash" android:layout_width="38dp" android:layout_height="26dp" android:text="/" android:textColor="#60a5fa" android:textSize="12sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyTab" android:layout_width="42dp" android:layout_height="26dp" android:text="TAB" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyEsc" android:layout_width="42dp" android:layout_height="26dp" android:text="ESC" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyHome" android:layout_width="46dp" android:layout_height="26dp" android:text="HOME" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyUp" android:layout_width="36dp" android:layout_height="26dp" android:text="▲" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyDown" android:layout_width="36dp" android:layout_height="26dp" android:text="▼" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyLeft" android:layout_width="36dp" android:layout_height="26dp" android:text="◄" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyRight" android:layout_width="36dp" android:layout_height="26dp" android:text="►" android:textColor="#ffffff" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyPgUp" android:layout_width="46dp" android:layout_height="26dp" android:text="PGUP" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/keyPgDn" android:layout_width="46dp" android:layout_height="26dp" android:text="PGDN" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" />
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- Bottom Input Prompt -->
+    <!-- Continuous Typing Input Bar -->
     <LinearLayout
         android:id="@+id/inputLayout"
         android:layout_width="match_parent"
@@ -118,8 +120,8 @@
         android:orientation="horizontal"
         android:layout_alignParentBottom="true"
         android:background="#000000"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="4dp">
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp">
 
         <TextView
             android:id="@+id/txtPrompt"
@@ -139,7 +141,8 @@
             android:fontFamily="monospace"
             android:inputType="textNoSuggestions"
             android:imeOptions="actionSend"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            android:paddingVertical="2dp" />
     </LinearLayout>
 
 </RelativeLayout>
