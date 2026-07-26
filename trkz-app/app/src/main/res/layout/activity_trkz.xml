@@ -5,13 +5,14 @@
     android:layout_height="match_parent"
     android:background="#000000"
     android:focusable="true"
+    android:focusableInTouchMode="true"
     android:clickable="true">
 
     <!-- Top Minimalist Session Bar -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="34dp"
+        android:layout_height="32dp"
         android:background="#050505"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
@@ -26,7 +27,8 @@
             android:textColor="#ffffff"
             android:textStyle="bold"
             android:fontFamily="monospace"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:letterSpacing="-0.03" />
 
         <TextView
             android:id="@+id/txtSessionTag"
@@ -36,12 +38,13 @@
             android:text="  [Session 1]"
             android:textColor="#777777"
             android:fontFamily="monospace"
-            android:textSize="11sp" />
+            android:textSize="11sp"
+            android:letterSpacing="-0.03" />
 
         <Button
             android:id="@+id/btnNewSession"
             android:layout_width="wrap_content"
-            android:layout_height="26dp"
+            android:layout_height="24dp"
             android:background="#151515"
             android:text="+ Session"
             android:textColor="#60a5fa"
@@ -59,7 +62,7 @@
         android:background="#1a1a1a"
         android:layout_below="@id/topBar" />
 
-    <!-- Terminal Display (Text Selectable Enabled + Pinch Zoom) -->
+    <!-- In-Stream Terminal Display (No bottom input bar, text selectable, condensed font) -->
     <ScrollView
         android:id="@+id/scrollConsole"
         android:layout_width="match_parent"
@@ -76,7 +79,8 @@
             android:textColor="#ffffff"
             android:fontFamily="monospace"
             android:textSize="13sp"
-            android:lineSpacingExtra="2dp"
+            android:letterSpacing="-0.03"
+            android:lineSpacingExtra="1dp"
             android:textIsSelectable="true"
             android:linksClickable="true" />
     </ScrollView>
@@ -87,7 +91,7 @@
         android:layout_width="match_parent"
         android:layout_height="34dp"
         android:background="#0a0a0a"
-        android:layout_above="@+id/inputLayout"
+        android:layout_alignParentBottom="true"
         android:scrollbars="none">
 
         <LinearLayout
@@ -111,38 +115,5 @@
             <Button android:id="@+id/keyPgDn" android:layout_width="46dp" android:layout_height="26dp" android:text="PGDN" android:textColor="#888888" android:textSize="10sp" android:background="#181818" android:fontFamily="monospace" />
         </LinearLayout>
     </HorizontalScrollView>
-
-    <!-- Continuous Typing Input Bar -->
-    <LinearLayout
-        android:id="@+id/inputLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_alignParentBottom="true"
-        android:background="#000000"
-        android:paddingHorizontal="6dp"
-        android:paddingVertical="2dp">
-
-        <TextView
-            android:id="@+id/txtPrompt"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="$ "
-            android:textColor="#34d399"
-            android:fontFamily="monospace"
-            android:textSize="13sp" />
-
-        <EditText
-            android:id="@+id/edtCommand"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@null"
-            android:textColor="#ffffff"
-            android:fontFamily="monospace"
-            android:inputType="textNoSuggestions"
-            android:imeOptions="actionSend"
-            android:textSize="13sp"
-            android:paddingVertical="2dp" />
-    </LinearLayout>
 
 </RelativeLayout>
