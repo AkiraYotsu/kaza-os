@@ -12,14 +12,17 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.text.Editable;
 import android.text.Html;
 import android.text.Spanned;
+import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -45,6 +48,7 @@ public class TrKZActivity extends AppCompatActivity {
 
     private TextView txtConsole;
     private ScrollView scrollConsole;
+    private EditText hiddenEditText;
     private TextView txtSessionTag;
     private Button btnNewSession;
     private Button btnCtrl;
@@ -80,6 +84,7 @@ public class TrKZActivity extends AppCompatActivity {
 
         txtConsole = findViewById(R.id.txtConsole);
         scrollConsole = findViewById(R.id.scrollConsole);
+        hiddenEditText = findViewById(R.id.hiddenEditText);
         txtSessionTag = findViewById(R.id.txtSessionTag);
         btnNewSession = findViewById(R.id.btnNewSession);
         btnCtrl = findViewById(R.id.keyCtrl);
@@ -101,7 +106,7 @@ public class TrKZActivity extends AppCompatActivity {
             }
         });
 
-        // Tap terminal screen to open keyboard & focus
+        // Tap terminal screen to focus hiddenEditText & open soft keyboard
         scrollConsole.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -113,13 +118,47 @@ public class TrKZActivity extends AppCompatActivity {
             }
         });
 
+        txtConsole.setOnClickListener(v -> showKeyboard());
+
+        // Connect hiddenEditText to currentInput
+        if (hiddenEditText != null) {
+            hiddenEditText.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    Session ses = getActiveSession();
+                    ses.currentInput = s.toString();
+                    updateTerminalDisplay();
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {}
+            });
+
+            hiddenEditText.setOnEditorActionListener((v, actionId, event) -> {
+                Session ses = getActiveSession();
+                String cmd = ses.currentInput.trim();
+                ses.currentInput = "";
+                hiddenEditText.setText("");
+                if (!cmd.isEmpty()) {
+                    executeKazaCommand(cmd);
+                } else {
+                    appendHistory("<font color='#34d399'>kaza@kernel:" + getPromptPath(ses) + "$ </font><br>");
+                }
+                return true;
+            });
+        }
+
         setupExtraKeys();
 
         btnNewSession.setOnClickListener(v -> createNewSession());
 
         checkAndRequestStoragePermissions();
         renderActiveSession();
-        showKeyboard();
+        
+        scrollConsole.postDelayed(this::showKeyboard, 300);
     }
 
     private File getTrkzStorageDir() {
@@ -159,6 +198,9 @@ public class TrKZActivity extends AppCompatActivity {
     private void renderActiveSession() {
         Session s = getActiveSession();
         txtSessionTag.setText("  [" + s.name + "]");
+        if (hiddenEditText != null) {
+            hiddenEditText.setText(s.currentInput);
+        }
         if (s.historyBuffer.length() == 0) {
             printHeader(s);
         } else {
@@ -191,7 +233,6 @@ public class TrKZActivity extends AppCompatActivity {
         updateTerminalDisplay();
     }
 
-    // In-stream Keyboard Event Handler
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -203,6 +244,7 @@ public class TrKZActivity extends AppCompatActivity {
                 if (keyCode == KeyEvent.KEYCODE_C) {
                     appendHistory("<font color='#34d399'>kaza@kernel:" + getPromptPath(s) + "$ </font><font color='#ffffff'>^C</font><br>");
                     s.currentInput = "";
+                    if (hiddenEditText != null) hiddenEditText.setText("");
                     resetCtrlState();
                     return true;
                 } else if (keyCode == KeyEvent.KEYCODE_V) {
@@ -221,16 +263,11 @@ public class TrKZActivity extends AppCompatActivity {
             if (keyCode == KeyEvent.KEYCODE_ENTER) {
                 String cmd = s.currentInput.trim();
                 s.currentInput = "";
+                if (hiddenEditText != null) hiddenEditText.setText("");
                 if (!cmd.isEmpty()) {
                     executeKazaCommand(cmd);
                 } else {
                     appendHistory("<font color='#34d399'>kaza@kernel:" + getPromptPath(s) + "$ </font><br>");
-                }
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_DEL) {
-                if (s.currentInput.length() > 0) {
-                    s.currentInput = s.currentInput.substring(0, s.currentInput.length() - 1);
-                    updateTerminalDisplay();
                 }
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
@@ -238,13 +275,6 @@ public class TrKZActivity extends AppCompatActivity {
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 navigateHistory(1);
-                return true;
-            }
-
-            char unicodeChar = (char) event.getUnicodeChar();
-            if (unicodeChar >= 32 && unicodeChar <= 126) {
-                s.currentInput += unicodeChar;
-                updateTerminalDisplay();
                 return true;
             }
         }
@@ -341,7 +371,6 @@ public class TrKZActivity extends AppCompatActivity {
             for (File f : files) {
                 count++;
                 if (f.isDirectory()) {
-                    // Vertical line-by-line listing (BLUE folders)
                     appendHistory("<font color='#60a5fa'><b>[DIR]  " + escapeHtml(f.getName()) + "/</b></font><br>");
                 } else if (f.canExecute() || f.getName().endsWith(".sh")) {
                     appendHistory("<font color='#34d399'>[EXEC] " + escapeHtml(f.getName()) + "</font><br>");
@@ -549,11 +578,9 @@ public class TrKZActivity extends AppCompatActivity {
             File parent = s.currentDir.getParentFile();
             return parent != null ? parent : s.currentDir;
         }
-        // Relative path resolution
         File rel = new File(s.currentDir, pathStr);
         if (rel.exists()) return rel;
 
-        // Case-insensitive match check
         File[] children = s.currentDir.listFiles();
         if (children != null) {
             for (File c : children) {
@@ -582,12 +609,12 @@ public class TrKZActivity extends AppCompatActivity {
     }
 
     private void showKeyboard() {
-        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm != null) {
-            txtConsole.setFocusable(true);
-            txtConsole.setFocusableInTouchMode(true);
-            txtConsole.requestFocus();
-            imm.showSoftInput(txtConsole, InputMethodManager.SHOW_IMPLICIT);
+        if (hiddenEditText != null) {
+            hiddenEditText.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(hiddenEditText, InputMethodManager.SHOW_FORCED);
+            }
         }
     }
 
@@ -596,7 +623,7 @@ public class TrKZActivity extends AppCompatActivity {
         btnCtrl.setOnClickListener(v -> {
             isCtrlActive = !isCtrlActive;
             if (isCtrlActive) {
-                btnCtrl.setBackgroundColor(Color.parseColor("#3B82F6")); // BLUE when active
+                btnCtrl.setBackgroundColor(Color.parseColor("#3B82F6"));
                 btnCtrl.setTextColor(Color.parseColor("#FFFFFF"));
             } else {
                 btnCtrl.setBackgroundColor(Color.parseColor("#181818"));
@@ -610,6 +637,7 @@ public class TrKZActivity extends AppCompatActivity {
         findViewById(R.id.keyEsc).setOnClickListener(v -> {
             Session s = getActiveSession();
             s.currentInput = "";
+            if (hiddenEditText != null) hiddenEditText.setText("");
             resetCtrlState();
             updateTerminalDisplay();
         });
@@ -639,12 +667,14 @@ public class TrKZActivity extends AppCompatActivity {
     private void insertInputChar(char c) {
         Session s = getActiveSession();
         s.currentInput += c;
+        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
         updateTerminalDisplay();
     }
 
     private void insertInputString(String str) {
         Session s = getActiveSession();
         s.currentInput += str;
+        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
         updateTerminalDisplay();
     }
 
@@ -661,11 +691,13 @@ public class TrKZActivity extends AppCompatActivity {
         if (s.historyIndex >= s.cmdHistory.size()) {
             s.historyIndex = s.cmdHistory.size();
             s.currentInput = "";
+            if (hiddenEditText != null) hiddenEditText.setText("");
             updateTerminalDisplay();
             return;
         }
 
         s.currentInput = s.cmdHistory.get(s.historyIndex);
+        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
         updateTerminalDisplay();
     }
 
@@ -679,6 +711,7 @@ public class TrKZActivity extends AppCompatActivity {
                     if (pasteText != null) {
                         Session s = getActiveSession();
                         s.currentInput += pasteText.toString();
+                        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
                         updateTerminalDisplay();
                     }
                 }

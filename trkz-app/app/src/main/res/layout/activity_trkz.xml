@@ -8,6 +8,18 @@
     android:focusableInTouchMode="true"
     android:clickable="true">
 
+    <!-- Hidden focusable EditText to reliably trigger soft keyboard -->
+    <EditText
+        android:id="@+id/hiddenEditText"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:background="@null"
+        android:textColor="@android:color/transparent"
+        android:inputType="textNoSuggestions|textMultiLine"
+        android:imeOptions="actionSend"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
     <!-- Top Minimalist Session Bar -->
     <LinearLayout
         android:id="@+id/topBar"
@@ -62,7 +74,7 @@
         android:background="#1a1a1a"
         android:layout_below="@id/topBar" />
 
-    <!-- In-Stream Terminal Display (No bottom input bar, text selectable, condensed font) -->
+    <!-- In-Stream Terminal Display -->
     <ScrollView
         android:id="@+id/scrollConsole"
         android:layout_width="match_parent"
