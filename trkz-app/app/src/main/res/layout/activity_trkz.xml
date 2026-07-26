@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:padding="8dp">
+
+    <!-- Top Status Header -->
+    <LinearLayout
+        android:id="@+id/headerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="8dp"
+        android:layout_alignParentTop="true">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TrKZ Terminal v1.1"
+            android:textColor="#00FF66"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="[ FIELD ACTIVE ]"
+            android:textColor="#00FF66"
+            android:fontFamily="monospace"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#222222"
+        android:layout_below="@id/headerLayout" />
+
+    <!-- Terminal Output Window -->
+    <ScrollView
+        android:id="@+id/scrollConsole"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/divider"
+        android:layout_above="@+id/inputLayout"
+        android:fillViewport="true">
+
+        <TextView
+            android:id="@+id/txtConsole"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="====================================================\n     KAZA OS v1.1 — TrKZ Terminal Standalone App    \n====================================================\nType 'help' or 'trkz' to inspect Storage Field.\n\n"
+            android:textColor="#FFFFFF"
+            android:fontFamily="monospace"
+            android:textSize="13sp"
+            android:lineSpacingExtra="3dp" />
+    </ScrollView>
+
+    <!-- Bottom Input Bar -->
+    <LinearLayout
+        android:id="@+id/inputLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_alignParentBottom="true"
+        android:paddingTop="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="kaza@kernel:~$ "
+            android:textColor="#00FF66"
+            android:fontFamily="monospace"
+            android:textSize="14sp" />
+
+        <EditText
+            android:id="@+id/edtCommand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@null"
+            android:hint="type command..."
+            android:textColorHint="#555555"
+            android:textColor="#FFFFFF"
+            android:fontFamily="monospace"
+            android:inputType="textNoSuggestions"
+            android:imeOptions="actionSend"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+</RelativeLayout>
