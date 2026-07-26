@@ -19,12 +19,14 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Make Gradlew Executable
-      run: chmod +x trkz-app/gradlew
+    - name: Setup Gradle Environment
+      uses: gradle/actions/setup-gradle@v3
 
-    - name: Build Debug APK
+    - name: Generate Wrapper & Build Debug APK
       run: |
         cd trkz-app
+        gradle wrapper
+        chmod +x gradlew
         ./gradlew assembleDebug --stacktrace
 
     - name: Upload APK Artifact
