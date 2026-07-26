@@ -330,7 +330,7 @@ public class TrKZActivity extends AppCompatActivity {
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
 
-                int responseCode = conn.getResponseCode();
+                final int responseCode = conn.getResponseCode();
                 BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder content = new StringBuilder();
                 String inputLine;
@@ -341,10 +341,11 @@ public class TrKZActivity extends AppCompatActivity {
                 }
                 in.close();
 
+                final int finalLines = lines;
                 runOnUiThread(() -> {
                     appendHistory("<font color='#888888'>HTTP Response: " + responseCode + " OK</font><br>");
                     appendHistory("<font color='#ffffff'>" + content.toString() + "</font>");
-                    if (lines >= 30) {
+                    if (finalLines >= 30) {
                         appendHistory("<font color='#888888'>... (content truncated for display)</font><br>");
                     }
                     appendHistory("<br>");
