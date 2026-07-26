@@ -13,7 +13,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.text.Html;
-import android.text.InputType;
 import android.text.Spanned;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -291,7 +290,7 @@ public class TrKZActivity extends AppCompatActivity {
             s.currentDir = getTrkzStorageDir();
             appendHistory("<font color='#34d399'>Switched workspace -> " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
             cmdLi(s, "");
-        } else if (cmd.equals("pkg") || cmd.equals("apt") || cmd.equals("npm")) {
+        } else if (cmd.equals("pkg") || cmd.equals("apt") || cmd.equals("npm") || cmd.equals("agy")) {
             cmdPkg(cmd, args);
         } else if (cmd.equals("session")) {
             cmdSession(args);
@@ -356,12 +355,15 @@ public class TrKZActivity extends AppCompatActivity {
 
     private void cmdPkg(String mgr, String args) {
         appendHistory("<font color='#888888'>--- " + mgr.toUpperCase() + " Package Subsystem ---</font><br>");
-        if (args.startsWith("install ")) {
+        if (mgr.equals("agy")) {
+            appendHistory("<font color='#34d399'>Launching Antigravity AI Agent Engine (AGY CLI)...</font><br>");
+            appendHistory("<font color='#ffffff'>AGY Engine active. Type your agent prompt directly in Kaza OS!</font><br><br>");
+        } else if (args.startsWith("install ")) {
             String pkgName = args.substring(8);
             appendHistory("<font color='#34d399'>Fetching " + escapeHtml(pkgName) + " repository...</font><br>");
             appendHistory("<font color='#ffffff'>Paket '" + escapeHtml(pkgName) + "' siap terintegrasi via Termux/POSIX layer!</font><br><br>");
         } else {
-            appendHistory("<font color='#ffffff'>Usage: " + mgr + " install &lt;package_name&gt; (e.g. pkg install python / npm install express)</font><br><br>");
+            appendHistory("<font color='#ffffff'>Usage: " + mgr + " install &lt;package_name&gt; (e.g. npm install -g @google/agy)</font><br><br>");
         }
     }
 
@@ -527,16 +529,16 @@ public class TrKZActivity extends AppCompatActivity {
     private void cmdHelp() {
         appendHistory("<font color='#888888'>Commands:</font><br>");
         appendHistory("<font color='#ffffff'>  pwd               - Print working directory</font><br>");
-        appendHtml("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory (e.g. cd Download / cd /sdcard)</font><br>");
-        appendHtml("<font color='#ffffff'>  ls / li [path]    - List files vertically (Folders in BLUE)</font><br>");
-        appendHtml("<font color='#ffffff'>  read / cat &lt;file&gt;  - Read text file</font><br>");
-        appendHtml("<font color='#ffffff'>  write &lt;file&gt; &lt;txt&gt; - Append text to file</font><br>");
-        appendHtml("<font color='#ffffff'>  mkdir / rm        - Create or remove files/folders</font><br>");
-        appendHtml("<font color='#ffffff'>  find &lt;kw&gt; [path]  - Search files</font><br>");
-        appendHtml("<font color='#ffffff'>  calc / time       - System tools</font><br>");
-        appendHtml("<font color='#ffffff'>  pkg install &lt;pkg&gt; - Install packages (python, npm, git)</font><br>");
-        appendHtml("<font color='#ffffff'>  session [new|n]   - Manage multi-sessions</font><br>");
-        appendHtml("<font color='#ffffff'>  clear / exit      - Clear or exit session</font><br><br>");
+        appendHistory("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory (e.g. cd Download / cd /sdcard)</font><br>");
+        appendHistory("<font color='#ffffff'>  ls / li [path]    - List files vertically (Folders in BLUE)</font><br>");
+        appendHistory("<font color='#ffffff'>  read / cat &lt;file&gt;  - Read text file</font><br>");
+        appendHistory("<font color='#ffffff'>  write &lt;file&gt; &lt;txt&gt; - Append text to file</font><br>");
+        appendHistory("<font color='#ffffff'>  mkdir / rm        - Create or remove files/folders</font><br>");
+        appendHistory("<font color='#ffffff'>  find &lt;kw&gt; [path]  - Search files</font><br>");
+        appendHistory("<font color='#ffffff'>  calc / time       - System tools</font><br>");
+        appendHistory("<font color='#ffffff'>  pkg / npm / agy    - Package &amp; AI Agent Engine Subsystem</font><br>");
+        appendHistory("<font color='#ffffff'>  session [new|n]   - Manage multi-sessions</font><br>");
+        appendHistory("<font color='#ffffff'>  clear / exit      - Clear or exit session</font><br><br>");
     }
 
     private File resolvePath(Session s, String pathStr) {
@@ -604,7 +606,7 @@ public class TrKZActivity extends AppCompatActivity {
 
         findViewById(R.id.keySlash).setOnClickListener(v -> insertInputChar('/'));
         findViewById(R.id.keyTab).setOnClickListener(v -> insertInputString("  "));
-        
+
         findViewById(R.id.keyEsc).setOnClickListener(v -> {
             Session s = getActiveSession();
             s.currentInput = "";
@@ -647,7 +649,6 @@ public class TrKZActivity extends AppCompatActivity {
     }
 
     private void moveInputCursor(int offset) {
-        // Cursor shift helper
         updateTerminalDisplay();
     }
 
