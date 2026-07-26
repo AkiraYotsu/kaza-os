@@ -35,6 +35,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ public class TrKZActivity extends AppCompatActivity {
     private ScaleGestureDetector scaleGestureDetector;
 
     private boolean isCtrlActive = false;
+    private boolean isUpdatingDisplay = false;
 
     // Multi-Session Management
     private static class Session {
@@ -106,21 +108,21 @@ public class TrKZActivity extends AppCompatActivity {
             }
         });
 
-        // Tap terminal screen to focus hiddenEditText & open soft keyboard
+        // Tap terminal screen to ensure focus & soft keyboard stays open
         scrollConsole.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 scaleGestureDetector.onTouchEvent(event);
                 if (event.getAction() == MotionEvent.ACTION_UP) {
-                    showKeyboard();
+                    focusAndShowKeyboard();
                 }
                 return false;
             }
         });
 
-        txtConsole.setOnClickListener(v -> showKeyboard());
+        txtConsole.setOnClickListener(v -> focusAndShowKeyboard());
 
-        // Connect hiddenEditText to currentInput
+        // Connect hiddenEditText for continuous typing without losing focus
         if (hiddenEditText != null) {
             hiddenEditText.addTextChangedListener(new TextWatcher() {
                 @Override
@@ -128,6 +130,7 @@ public class TrKZActivity extends AppCompatActivity {
 
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    if (isUpdatingDisplay) return;
                     Session ses = getActiveSession();
                     ses.currentInput = s.toString();
                     updateTerminalDisplay();
@@ -141,7 +144,10 @@ public class TrKZActivity extends AppCompatActivity {
                 Session ses = getActiveSession();
                 String cmd = ses.currentInput.trim();
                 ses.currentInput = "";
+                isUpdatingDisplay = true;
                 hiddenEditText.setText("");
+                isUpdatingDisplay = false;
+
                 if (!cmd.isEmpty()) {
                     executeKazaCommand(cmd);
                 } else {
@@ -152,13 +158,12 @@ public class TrKZActivity extends AppCompatActivity {
         }
 
         setupExtraKeys();
-
         btnNewSession.setOnClickListener(v -> createNewSession());
 
         checkAndRequestStoragePermissions();
         renderActiveSession();
-        
-        scrollConsole.postDelayed(this::showKeyboard, 300);
+
+        scrollConsole.postDelayed(this::focusAndShowKeyboard, 300);
     }
 
     private File getTrkzStorageDir() {
@@ -199,7 +204,10 @@ public class TrKZActivity extends AppCompatActivity {
         Session s = getActiveSession();
         txtSessionTag.setText("  [" + s.name + "]");
         if (hiddenEditText != null) {
+            isUpdatingDisplay = true;
             hiddenEditText.setText(s.currentInput);
+            hiddenEditText.setSelection(s.currentInput.length());
+            isUpdatingDisplay = false;
         }
         if (s.historyBuffer.length() == 0) {
             printHeader(s);
@@ -211,8 +219,9 @@ public class TrKZActivity extends AppCompatActivity {
 
     private void printHeader(Session s) {
         appendHistory("TrKZ Terminal v1.1 (" + s.name + ")<br>");
+        appendHistory("<font color='#888888'>Real POSIX System Shell Engine Active</font><br>");
         appendHistory("<font color='#888888'>Working Dir: " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
-        appendHistory("<font color='#888888'>Type 'help' or '/' for commands.</font><br><br>");
+        appendHistory("<font color='#888888'>Type 'help' or any Linux shell command.</font><br><br>");
     }
 
     private void updateTerminalDisplay() {
@@ -281,6 +290,7 @@ public class TrKZActivity extends AppCompatActivity {
         return super.dispatchKeyEvent(event);
     }
 
+    // REAL POSIX SYSTEM SHELL EXECUTION ENGINE
     private void executeKazaCommand(String rawInput) {
         String clean = rawInput.trim();
         if (clean.startsWith("/")) clean = clean.substring(1);
@@ -296,36 +306,17 @@ public class TrKZActivity extends AppCompatActivity {
         String cmd = parts[0].toLowerCase();
         String args = parts.length > 1 ? parts[1] : "";
 
+        // Built-in Internal Shell Commands
         if (cmd.equals("pwd")) {
             appendHistory("<font color='#ffffff'>" + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br><br>");
         } else if (cmd.equals("cd")) {
             cmdCd(s, args);
-        } else if (cmd.equals("li") || cmd.equals("ls")) {
-            cmdLi(s, args);
-        } else if (cmd.equals("read") || cmd.equals("cat")) {
-            cmdRead(s, args);
-        } else if (cmd.equals("write")) {
-            cmdWrite(s, args);
-        } else if (cmd.equals("mkdir")) {
-            cmdMkdir(s, args);
-        } else if (cmd.equals("rm")) {
-            cmdRm(s, args);
-        } else if (cmd.equals("find")) {
-            cmdFind(s, args);
-        } else if (cmd.equals("calc")) {
-            cmdCalc(args);
-        } else if (cmd.equals("time") || cmd.equals("date")) {
-            cmdTime();
         } else if (cmd.equals("trkz")) {
             s.currentDir = getTrkzStorageDir();
             appendHistory("<font color='#34d399'>Switched workspace -> " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
-            cmdLi(s, "");
-        } else if (cmd.equals("pkg") || cmd.equals("apt") || cmd.equals("npm") || cmd.equals("agy")) {
-            cmdPkg(cmd, args);
+            executeRealShellProcess("ls -la");
         } else if (cmd.equals("session")) {
             cmdSession(args);
-        } else if (cmd.equals("sysinfo")) {
-            cmdSysinfo(s);
         } else if (cmd.equals("clear")) {
             s.historyBuffer.setLength(0);
             txtConsole.setText("");
@@ -335,10 +326,55 @@ public class TrKZActivity extends AppCompatActivity {
         } else if (cmd.equals("help")) {
             cmdHelp();
         } else {
-            appendHistory("<font color='#f87171'>kaza: command not found: " + escapeHtml(clean) + "</font><br><br>");
+            // EXECUTE REAL SYSTEM POSIX / ANDROID SHELL PROCESS (/system/bin/sh)
+            executeRealShellProcess(clean);
         }
 
         scrollToBottom();
+    }
+
+    // Execute Real Shell Binaries (/system/bin/sh)
+    private void executeRealShellProcess(String commandLine) {
+        Session s = getActiveSession();
+        try {
+            ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", "-c", commandLine);
+            pb.directory(s.currentDir);
+            pb.redirectErrorStream(true);
+
+            Process process = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            boolean hasOutput = false;
+            while ((line = reader.readLine()) != null) {
+                hasOutput = true;
+                if (line.contains("Permission denied") || line.contains("not found") || line.contains("Error")) {
+                    appendHistory("<font color='#f87171'>" + escapeHtml(line) + "</font><br>");
+                } else if (line.endsWith("/")) {
+                    appendHistory("<font color='#60a5fa'><b>" + escapeHtml(line) + "</b></font><br>");
+                } else {
+                    appendHistory("<font color='#ffffff'>" + escapeHtml(line) + "</font><br>");
+                }
+            }
+
+            process.waitFor();
+
+            if (!hasOutput) {
+                appendHistory("<font color='#888888'>Process exited with status " + process.exitValue() + "</font><br>");
+            }
+            appendHistory("<br>");
+
+            // Special guidance if npm/pkg binaries are missing from standard system PATH
+            if (commandLine.startsWith("npm") || commandLine.startsWith("pkg") || commandLine.startsWith("node") || commandLine.startsWith("agy")) {
+                if (process.exitValue() != 0) {
+                    appendHistory("<font color='#60a5fa'>[TrKZ POSIX Hint]</font> <font color='#ffffff'>Node.js/npm belum terinstall di Android System PATH.<br>");
+                    appendHistory("Untuk mengaktifkan <b>npm</b> & <b>AGY CLI</b> full di TrKZ, jalankan:<br>");
+                    appendHistory("<font color='#34d399'>curl -sSL https://raw.githubusercontent.com/AkiraYotsu/kaza-os/main/install.sh | bash</font><br><br>");
+                }
+            }
+        } catch (Exception e) {
+            appendHistory("<font color='#f87171'>sh: " + escapeHtml(e.getMessage()) + "</font><br><br>");
+        }
     }
 
     private void cmdCd(Session s, String pathStr) {
@@ -355,170 +391,6 @@ public class TrKZActivity extends AppCompatActivity {
         } else {
             appendHistory("<font color='#f87171'>cd: no such file or directory: " + escapeHtml(pathStr) + "</font><br><br>");
         }
-    }
-
-    private void cmdLi(Session s, String pathStr) {
-        File targetDir = pathStr.isEmpty() ? s.currentDir : resolvePath(s, pathStr);
-
-        if (!targetDir.exists() || !targetDir.isDirectory()) {
-            appendHistory("<font color='#f87171'>ls: cannot access '" + escapeHtml(targetDir.getAbsolutePath()) + "': No such directory</font><br><br>");
-            return;
-        }
-
-        File[] files = targetDir.listFiles();
-        int count = 0;
-        if (files != null) {
-            for (File f : files) {
-                count++;
-                if (f.isDirectory()) {
-                    appendHistory("<font color='#60a5fa'><b>[DIR]  " + escapeHtml(f.getName()) + "/</b></font><br>");
-                } else if (f.canExecute() || f.getName().endsWith(".sh")) {
-                    appendHistory("<font color='#34d399'>[EXEC] " + escapeHtml(f.getName()) + "</font><br>");
-                } else {
-                    appendHistory("<font color='#ffffff'>[FILE] " + escapeHtml(f.getName()) + "</font> <font color='#888888'>(" + f.length() + " B)</font><br>");
-                }
-            }
-        }
-        appendHistory("<font color='#888888'>Total entries: " + count + "</font><br><br>");
-    }
-
-    private void cmdPkg(String mgr, String args) {
-        appendHistory("<font color='#888888'>--- " + mgr.toUpperCase() + " Package Subsystem ---</font><br>");
-        if (mgr.equals("agy")) {
-            appendHistory("<font color='#34d399'>Launching Antigravity AI Agent Engine (AGY CLI)...</font><br>");
-            appendHistory("<font color='#ffffff'>AGY Engine active. Type your agent prompt directly in Kaza OS!</font><br><br>");
-        } else if (args.startsWith("install ")) {
-            String pkgName = args.substring(8);
-            appendHistory("<font color='#34d399'>Fetching " + escapeHtml(pkgName) + " repository...</font><br>");
-            appendHistory("<font color='#ffffff'>Paket '" + escapeHtml(pkgName) + "' siap terintegrasi via Termux/POSIX layer!</font><br><br>");
-        } else {
-            appendHistory("<font color='#ffffff'>Usage: " + mgr + " install &lt;package_name&gt; (e.g. npm install -g @google/agy)</font><br><br>");
-        }
-    }
-
-    private void cmdRead(Session s, String filepath) {
-        if (filepath.isEmpty()) {
-            appendHistory("<font color='#f87171'>read: missing file operand</font><br><br>");
-            return;
-        }
-        File file = resolvePath(s, filepath);
-        if (!file.exists() || !file.isFile()) {
-            appendHistory("<font color='#f87171'>read: " + escapeHtml(file.getAbsolutePath()) + ": No such file</font><br><br>");
-            return;
-        }
-
-        appendHistory("<font color='#888888'>--- " + escapeHtml(file.getName()) + " ---</font><br>");
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                appendHistory("<font color='#ffffff'>" + escapeHtml(line) + "</font><br>");
-            }
-            appendHistory("<font color='#888888'>--- EOF ---</font><br><br>");
-        } catch (Exception e) {
-            appendHistory("<font color='#f87171'>read: error reading file</font><br><br>");
-        }
-    }
-
-    private void cmdWrite(Session s, String args) {
-        String[] parts = args.split("\\s+", 2);
-        if (parts.length == 0 || parts[0].isEmpty()) {
-            appendHistory("<font color='#f87171'>write: missing file operand</font><br><br>");
-            return;
-        }
-        File file = resolvePath(s, parts[0]);
-        String text = parts.length > 1 ? parts[1] : "";
-
-        try (PrintWriter writer = new PrintWriter(new FileWriter(file, true))) {
-            writer.println(text);
-            appendHistory("<font color='#34d399'>write: saved -> " + escapeHtml(file.getName()) + "</font><br><br>");
-        } catch (Exception e) {
-            appendHistory("<font color='#f87171'>write: permission denied</font><br><br>");
-        }
-    }
-
-    private void cmdMkdir(Session s, String dirpath) {
-        if (dirpath.isEmpty()) {
-            appendHistory("<font color='#f87171'>mkdir: missing operand</font><br><br>");
-            return;
-        }
-        File dir = resolvePath(s, dirpath);
-        if (dir.mkdirs() || dir.exists()) {
-            appendHistory("<font color='#34d399'>mkdir: created -> " + escapeHtml(dir.getName()) + "</font><br><br>");
-        } else {
-            appendHistory("<font color='#f87171'>mkdir: cannot create directory</font><br><br>");
-        }
-    }
-
-    private void cmdRm(Session s, String pathStr) {
-        if (pathStr.isEmpty()) {
-            appendHistory("<font color='#f87171'>rm: missing operand</font><br><br>");
-            return;
-        }
-        File target = resolvePath(s, pathStr);
-        if (target.exists() && target.delete()) {
-            appendHistory("<font color='#888888'>rm: removed -> " + escapeHtml(target.getName()) + "</font><br><br>");
-        } else {
-            appendHistory("<font color='#f87171'>rm: cannot remove '" + escapeHtml(pathStr) + "'</font><br><br>");
-        }
-    }
-
-    private void cmdFind(Session s, String args) {
-        String[] parts = args.split("\\s+", 2);
-        String keyword = parts[0];
-        if (keyword.isEmpty()) {
-            appendHistory("<font color='#f87171'>find: missing keyword</font><br><br>");
-            return;
-        }
-        File baseDir = parts.length > 1 ? resolvePath(s, parts[1]) : s.currentDir;
-        if (!baseDir.exists() || !baseDir.isDirectory()) {
-            appendHistory("<font color='#f87171'>find: path inaccessible</font><br><br>");
-            return;
-        }
-
-        File[] files = baseDir.listFiles();
-        int matches = 0;
-        if (files != null) {
-            for (File f : files) {
-                if (f.getName().toLowerCase().contains(keyword.toLowerCase())) {
-                    matches++;
-                    if (f.isDirectory()) {
-                        appendHistory("<font color='#60a5fa'>  [DIR]  " + escapeHtml(f.getAbsolutePath()) + "</font><br>");
-                    } else {
-                        appendHistory("<font color='#ffffff'>  [FILE] " + escapeHtml(f.getAbsolutePath()) + "</font><br>");
-                    }
-                }
-            }
-        }
-        appendHistory("<font color='#888888'>find: " + matches + " match(es)</font><br><br>");
-    }
-
-    private void cmdCalc(String expr) {
-        if (expr.isEmpty()) {
-            appendHistory("<font color='#f87171'>calc: missing expression</font><br><br>");
-            return;
-        }
-        try {
-            String[] tokens = expr.split("\\s+");
-            double a = Double.parseDouble(tokens[0]);
-            String op = tokens[1];
-            double b = Double.parseDouble(tokens[2]);
-            double res = 0;
-            if (op.equals("+")) res = a + b;
-            else if (op.equals("-")) res = a - b;
-            else if (op.equals("*")) res = a * b;
-            else if (op.equals("/")) {
-                if (b == 0) { appendHistory("<font color='#f87171'>calc: division by zero</font><br><br>"); return; }
-                res = a / b;
-            }
-            appendHistory("<font color='#34d399'>= " + res + "</font><br><br>");
-        } catch (Exception e) {
-            appendHistory("<font color='#f87171'>calc: invalid format</font><br><br>");
-        }
-    }
-
-    private void cmdTime() {
-        String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date());
-        appendHistory("<font color='#888888'>" + now + "</font><br><br>");
     }
 
     private void cmdSession(String arg) {
@@ -547,25 +419,13 @@ public class TrKZActivity extends AppCompatActivity {
         }
     }
 
-    private void cmdSysinfo(Session s) {
-        appendHistory("<font color='#888888'>--- System Info ---</font><br>");
-        appendHistory("<font color='#ffffff'>OS          : Kaza OS v1.1</font><br>");
-        appendHistory("<font color='#ffffff'>App         : TrKZ Terminal (com.kazaos.trkz)</font><br>");
-        appendHistory("<font color='#ffffff'>Active Dir  : " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
-        appendHistory("<font color='#34d399'>Storage     : Full System Access Granted</font><br><br>");
-    }
-
     private void cmdHelp() {
         appendHistory("<font color='#888888'>Commands:</font><br>");
         appendHistory("<font color='#ffffff'>  pwd               - Print working directory</font><br>");
         appendHistory("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory (e.g. cd Download / cd /sdcard)</font><br>");
-        appendHistory("<font color='#ffffff'>  ls / li [path]    - List files vertically (Folders in BLUE)</font><br>");
-        appendHistory("<font color='#ffffff'>  read / cat &lt;file&gt;  - Read text file</font><br>");
-        appendHistory("<font color='#ffffff'>  write &lt;file&gt; &lt;txt&gt; - Append text to file</font><br>");
-        appendHistory("<font color='#ffffff'>  mkdir / rm        - Create or remove files/folders</font><br>");
-        appendHistory("<font color='#ffffff'>  find &lt;kw&gt; [path]  - Search files</font><br>");
-        appendHistory("<font color='#ffffff'>  calc / time       - System tools</font><br>");
-        appendHistory("<font color='#ffffff'>  pkg / npm / agy    - Package &amp; AI Agent Engine Subsystem</font><br>");
+        appendHistory("<font color='#ffffff'>  ls / li [path]    - List files via real POSIX shell</font><br>");
+        appendHistory("<font color='#ffffff'>  mkdir / rm / cat  - Standard Linux filesystem commands</font><br>");
+        appendHistory("<font color='#ffffff'>  npm / pkg / agy   - Package &amp; AI Agent Engine Subsystem</font><br>");
         appendHistory("<font color='#ffffff'>  session [new|n]   - Manage multi-sessions</font><br>");
         appendHistory("<font color='#ffffff'>  clear / exit      - Clear or exit session</font><br><br>");
     }
@@ -608,7 +468,7 @@ public class TrKZActivity extends AppCompatActivity {
         }
     }
 
-    private void showKeyboard() {
+    private void focusAndShowKeyboard() {
         if (hiddenEditText != null) {
             hiddenEditText.requestFocus();
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -637,7 +497,11 @@ public class TrKZActivity extends AppCompatActivity {
         findViewById(R.id.keyEsc).setOnClickListener(v -> {
             Session s = getActiveSession();
             s.currentInput = "";
-            if (hiddenEditText != null) hiddenEditText.setText("");
+            if (hiddenEditText != null) {
+                isUpdatingDisplay = true;
+                hiddenEditText.setText("");
+                isUpdatingDisplay = false;
+            }
             resetCtrlState();
             updateTerminalDisplay();
         });
@@ -667,14 +531,24 @@ public class TrKZActivity extends AppCompatActivity {
     private void insertInputChar(char c) {
         Session s = getActiveSession();
         s.currentInput += c;
-        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
+        if (hiddenEditText != null) {
+            isUpdatingDisplay = true;
+            hiddenEditText.setText(s.currentInput);
+            hiddenEditText.setSelection(s.currentInput.length());
+            isUpdatingDisplay = false;
+        }
         updateTerminalDisplay();
     }
 
     private void insertInputString(String str) {
         Session s = getActiveSession();
         s.currentInput += str;
-        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
+        if (hiddenEditText != null) {
+            isUpdatingDisplay = true;
+            hiddenEditText.setText(s.currentInput);
+            hiddenEditText.setSelection(s.currentInput.length());
+            isUpdatingDisplay = false;
+        }
         updateTerminalDisplay();
     }
 
@@ -691,13 +565,22 @@ public class TrKZActivity extends AppCompatActivity {
         if (s.historyIndex >= s.cmdHistory.size()) {
             s.historyIndex = s.cmdHistory.size();
             s.currentInput = "";
-            if (hiddenEditText != null) hiddenEditText.setText("");
+            if (hiddenEditText != null) {
+                isUpdatingDisplay = true;
+                hiddenEditText.setText("");
+                isUpdatingDisplay = false;
+            }
             updateTerminalDisplay();
             return;
         }
 
         s.currentInput = s.cmdHistory.get(s.historyIndex);
-        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
+        if (hiddenEditText != null) {
+            isUpdatingDisplay = true;
+            hiddenEditText.setText(s.currentInput);
+            hiddenEditText.setSelection(s.currentInput.length());
+            isUpdatingDisplay = false;
+        }
         updateTerminalDisplay();
     }
 
@@ -711,7 +594,12 @@ public class TrKZActivity extends AppCompatActivity {
                     if (pasteText != null) {
                         Session s = getActiveSession();
                         s.currentInput += pasteText.toString();
-                        if (hiddenEditText != null) hiddenEditText.setText(s.currentInput);
+                        if (hiddenEditText != null) {
+                            isUpdatingDisplay = true;
+                            hiddenEditText.setText(s.currentInput);
+                            hiddenEditText.setSelection(s.currentInput.length());
+                            isUpdatingDisplay = false;
+                        }
                         updateTerminalDisplay();
                     }
                 }
