@@ -12,10 +12,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
-import android.text.Editable;
 import android.text.Html;
 import android.text.Spanned;
-import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -37,6 +35,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -49,7 +49,8 @@ public class TrKZActivity extends AppCompatActivity {
 
     private TextView txtConsole;
     private ScrollView scrollConsole;
-    private EditText hiddenEditText;
+    private TextView txtPromptLabel;
+    private EditText edtPromptInput;
     private TextView txtSessionTag;
     private Button btnNewSession;
     private Button btnCtrl;
@@ -57,7 +58,6 @@ public class TrKZActivity extends AppCompatActivity {
     private ScaleGestureDetector scaleGestureDetector;
 
     private boolean isCtrlActive = false;
-    private boolean isUpdatingDisplay = false;
 
     // Multi-Session Management
     private static class Session {
@@ -65,7 +65,6 @@ public class TrKZActivity extends AppCompatActivity {
         String name;
         File currentDir;
         StringBuilder historyBuffer = new StringBuilder();
-        String currentInput = "";
         List<String> cmdHistory = new ArrayList<>();
         int historyIndex = -1;
 
@@ -86,7 +85,8 @@ public class TrKZActivity extends AppCompatActivity {
 
         txtConsole = findViewById(R.id.txtConsole);
         scrollConsole = findViewById(R.id.scrollConsole);
-        hiddenEditText = findViewById(R.id.hiddenEditText);
+        txtPromptLabel = findViewById(R.id.txtPromptLabel);
+        edtPromptInput = findViewById(R.id.edtPromptInput);
         txtSessionTag = findViewById(R.id.txtSessionTag);
         btnNewSession = findViewById(R.id.btnNewSession);
         btnCtrl = findViewById(R.id.keyCtrl);
@@ -104,53 +104,32 @@ public class TrKZActivity extends AppCompatActivity {
                 if (currentTextSizeSp < 10.0f) currentTextSizeSp = 10.0f;
                 if (currentTextSizeSp > 26.0f) currentTextSizeSp = 26.0f;
                 txtConsole.setTextSize(currentTextSizeSp);
+                if (txtPromptLabel != null) txtPromptLabel.setTextSize(currentTextSizeSp);
+                if (edtPromptInput != null) edtPromptInput.setTextSize(currentTextSizeSp);
                 return true;
             }
         });
 
-        // Tap terminal screen to ensure focus & soft keyboard stays open
-        scrollConsole.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                scaleGestureDetector.onTouchEvent(event);
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    focusAndShowKeyboard();
-                }
-                return false;
+        // Tap terminal screen to focus prompt input
+        scrollConsole.setOnTouchListener((v, event) -> {
+            scaleGestureDetector.onTouchEvent(event);
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                focusPromptInput();
             }
+            return false;
         });
 
-        txtConsole.setOnClickListener(v -> focusAndShowKeyboard());
+        txtConsole.setOnClickListener(v -> focusPromptInput());
 
-        // Connect hiddenEditText for continuous typing without losing focus
-        if (hiddenEditText != null) {
-            hiddenEditText.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    if (isUpdatingDisplay) return;
-                    Session ses = getActiveSession();
-                    ses.currentInput = s.toString();
-                    updateTerminalDisplay();
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {}
-            });
-
-            hiddenEditText.setOnEditorActionListener((v, actionId, event) -> {
-                Session ses = getActiveSession();
-                String cmd = ses.currentInput.trim();
-                ses.currentInput = "";
-                isUpdatingDisplay = true;
-                hiddenEditText.setText("");
-                isUpdatingDisplay = false;
-
+        // Handle Enter key for continuous typing without losing focus
+        if (edtPromptInput != null) {
+            edtPromptInput.setOnEditorActionListener((v, actionId, event) -> {
+                String cmd = edtPromptInput.getText().toString().trim();
+                edtPromptInput.setText("");
                 if (!cmd.isEmpty()) {
                     executeKazaCommand(cmd);
                 } else {
+                    Session ses = getActiveSession();
                     appendHistory("<font color='#34d399'>kaza@kernel:" + getPromptPath(ses) + "$ </font><br>");
                 }
                 return true;
@@ -163,7 +142,7 @@ public class TrKZActivity extends AppCompatActivity {
         checkAndRequestStoragePermissions();
         renderActiveSession();
 
-        scrollConsole.postDelayed(this::focusAndShowKeyboard, 300);
+        scrollConsole.postDelayed(this::focusPromptInput, 300);
     }
 
     private File getTrkzStorageDir() {
@@ -203,12 +182,7 @@ public class TrKZActivity extends AppCompatActivity {
     private void renderActiveSession() {
         Session s = getActiveSession();
         txtSessionTag.setText("  [" + s.name + "]");
-        if (hiddenEditText != null) {
-            isUpdatingDisplay = true;
-            hiddenEditText.setText(s.currentInput);
-            hiddenEditText.setSelection(s.currentInput.length());
-            isUpdatingDisplay = false;
-        }
+        updatePromptLabel(s);
         if (s.historyBuffer.length() == 0) {
             printHeader(s);
         } else {
@@ -217,22 +191,26 @@ public class TrKZActivity extends AppCompatActivity {
         scrollToBottom();
     }
 
+    private void updatePromptLabel(Session s) {
+        if (txtPromptLabel != null) {
+            txtPromptLabel.setText(Html.fromHtml("<font color='#34d399'>kaza@kernel:" + getPromptPath(s) + "$ </font>"));
+        }
+    }
+
     private void printHeader(Session s) {
         appendHistory("TrKZ Terminal v1.1 (" + s.name + ")<br>");
-        appendHistory("<font color='#888888'>Real POSIX System Shell Engine Active</font><br>");
+        appendHistory("<font color='#888888'>Real POSIX Shell &amp; Native Network Downloader Active</font><br>");
         appendHistory("<font color='#888888'>Working Dir: " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
-        appendHistory("<font color='#888888'>Type 'help' or any Linux shell command.</font><br><br>");
+        appendHistory("<font color='#888888'>Type 'help', 'curl &lt;url&gt;', or 'pkg install node'</font><br><br>");
     }
 
     private void updateTerminalDisplay() {
         Session s = getActiveSession();
-        String prompt = "<font color='#34d399'>kaza@kernel:" + getPromptPath(s) + "$ </font>";
-        String inputLine = "<font color='#ffffff'>" + escapeHtml(s.currentInput) + "█</font>";
-
         Spanned spanned = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N ?
-                Html.fromHtml(s.historyBuffer.toString() + prompt + inputLine, Html.FROM_HTML_MODE_LEGACY) :
-                Html.fromHtml(s.historyBuffer.toString() + prompt + inputLine);
+                Html.fromHtml(s.historyBuffer.toString(), Html.FROM_HTML_MODE_LEGACY) :
+                Html.fromHtml(s.historyBuffer.toString());
         txtConsole.setText(spanned);
+        updatePromptLabel(s);
         scrollToBottom();
     }
 
@@ -252,8 +230,7 @@ public class TrKZActivity extends AppCompatActivity {
             if (isCtrlActive) {
                 if (keyCode == KeyEvent.KEYCODE_C) {
                     appendHistory("<font color='#34d399'>kaza@kernel:" + getPromptPath(s) + "$ </font><font color='#ffffff'>^C</font><br>");
-                    s.currentInput = "";
-                    if (hiddenEditText != null) hiddenEditText.setText("");
+                    if (edtPromptInput != null) edtPromptInput.setText("");
                     resetCtrlState();
                     return true;
                 } else if (keyCode == KeyEvent.KEYCODE_V) {
@@ -269,17 +246,7 @@ public class TrKZActivity extends AppCompatActivity {
                 resetCtrlState();
             }
 
-            if (keyCode == KeyEvent.KEYCODE_ENTER) {
-                String cmd = s.currentInput.trim();
-                s.currentInput = "";
-                if (hiddenEditText != null) hiddenEditText.setText("");
-                if (!cmd.isEmpty()) {
-                    executeKazaCommand(cmd);
-                } else {
-                    appendHistory("<font color='#34d399'>kaza@kernel:" + getPromptPath(s) + "$ </font><br>");
-                }
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                 navigateHistory(-1);
                 return true;
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
@@ -290,7 +257,7 @@ public class TrKZActivity extends AppCompatActivity {
         return super.dispatchKeyEvent(event);
     }
 
-    // REAL POSIX SYSTEM SHELL EXECUTION ENGINE
+    // COMMAND EXECUTION ENGINE WITH BUILT-IN CURL & SHELL
     private void executeKazaCommand(String rawInput) {
         String clean = rawInput.trim();
         if (clean.startsWith("/")) clean = clean.substring(1);
@@ -306,7 +273,7 @@ public class TrKZActivity extends AppCompatActivity {
         String cmd = parts[0].toLowerCase();
         String args = parts.length > 1 ? parts[1] : "";
 
-        // Built-in Internal Shell Commands
+        // Handle built-in commands & curl
         if (cmd.equals("pwd")) {
             appendHistory("<font color='#ffffff'>" + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br><br>");
         } else if (cmd.equals("cd")) {
@@ -315,6 +282,8 @@ public class TrKZActivity extends AppCompatActivity {
             s.currentDir = getTrkzStorageDir();
             appendHistory("<font color='#34d399'>Switched workspace -> " + escapeHtml(s.currentDir.getAbsolutePath()) + "</font><br>");
             executeRealShellProcess("ls -la");
+        } else if (cmd.equals("curl")) {
+            cmdNativeCurl(args);
         } else if (cmd.equals("session")) {
             cmdSession(args);
         } else if (cmd.equals("clear")) {
@@ -326,11 +295,66 @@ public class TrKZActivity extends AppCompatActivity {
         } else if (cmd.equals("help")) {
             cmdHelp();
         } else {
-            // EXECUTE REAL SYSTEM POSIX / ANDROID SHELL PROCESS (/system/bin/sh)
+            // Execute via Linux System Process (/system/bin/sh)
             executeRealShellProcess(clean);
         }
 
         scrollToBottom();
+    }
+
+    // BUILT-IN NATIVE CURL (HttpURLConnection)
+    private void cmdNativeCurl(String args) {
+        if (args.isEmpty()) {
+            appendHistory("<font color='#f87171'>curl: try 'curl --help' or 'curl &lt;url&gt;'</font><br><br>");
+            return;
+        }
+
+        // Clean flags like -sSL
+        String urlStr = args.replaceAll("-[a-zA-Z]+\\s+", "").trim();
+        if (urlStr.contains("|")) {
+            urlStr = urlStr.split("\\|")[0].trim();
+        }
+
+        if (!urlStr.startsWith("http://") && !urlStr.startsWith("https://")) {
+            urlStr = "https://" + urlStr;
+        }
+
+        final String targetUrl = urlStr;
+        appendHistory("<font color='#34d399'>Connecting to " + escapeHtml(targetUrl) + "...</font><br>");
+
+        new Thread(() -> {
+            try {
+                URL url = new URL(targetUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+
+                int responseCode = conn.getResponseCode();
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder content = new StringBuilder();
+                String inputLine;
+                int lines = 0;
+                while ((inputLine = in.readLine()) != null && lines < 30) {
+                    content.append(escapeHtml(inputLine)).append("<br>");
+                    lines++;
+                }
+                in.close();
+
+                runOnUiThread(() -> {
+                    appendHistory("<font color='#888888'>HTTP Response: " + responseCode + " OK</font><br>");
+                    appendHistory("<font color='#ffffff'>" + content.toString() + "</font>");
+                    if (lines >= 30) {
+                        appendHistory("<font color='#888888'>... (content truncated for display)</font><br>");
+                    }
+                    appendHistory("<br>");
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    appendHistory("<font color='#f87171'>curl: error: " + escapeHtml(e.getMessage()) + "</font><br><br>");
+                });
+            }
+        }).start();
     }
 
     // Execute Real Shell Binaries (/system/bin/sh)
@@ -363,15 +387,6 @@ public class TrKZActivity extends AppCompatActivity {
                 appendHistory("<font color='#888888'>Process exited with status " + process.exitValue() + "</font><br>");
             }
             appendHistory("<br>");
-
-            // Special guidance if npm/pkg binaries are missing from standard system PATH
-            if (commandLine.startsWith("npm") || commandLine.startsWith("pkg") || commandLine.startsWith("node") || commandLine.startsWith("agy")) {
-                if (process.exitValue() != 0) {
-                    appendHistory("<font color='#60a5fa'>[TrKZ POSIX Hint]</font> <font color='#ffffff'>Node.js/npm belum terinstall di Android System PATH.<br>");
-                    appendHistory("Untuk mengaktifkan <b>npm</b> & <b>AGY CLI</b> full di TrKZ, jalankan:<br>");
-                    appendHistory("<font color='#34d399'>curl -sSL https://raw.githubusercontent.com/AkiraYotsu/kaza-os/main/install.sh | bash</font><br><br>");
-                }
-            }
         } catch (Exception e) {
             appendHistory("<font color='#f87171'>sh: " + escapeHtml(e.getMessage()) + "</font><br><br>");
         }
@@ -423,9 +438,9 @@ public class TrKZActivity extends AppCompatActivity {
         appendHistory("<font color='#888888'>Commands:</font><br>");
         appendHistory("<font color='#ffffff'>  pwd               - Print working directory</font><br>");
         appendHistory("<font color='#ffffff'>  cd &lt;path&gt;         - Change directory (e.g. cd Download / cd /sdcard)</font><br>");
-        appendHistory("<font color='#ffffff'>  ls / li [path]    - List files via real POSIX shell</font><br>");
+        appendHistory("<font color='#ffffff'>  ls / li [path]    - List files vertically (Folders in BLUE)</font><br>");
+        appendHistory("<font color='#ffffff'>  curl &lt;url&gt;        - Built-in Native HTTP Downloader</font><br>");
         appendHistory("<font color='#ffffff'>  mkdir / rm / cat  - Standard Linux filesystem commands</font><br>");
-        appendHistory("<font color='#ffffff'>  npm / pkg / agy   - Package &amp; AI Agent Engine Subsystem</font><br>");
         appendHistory("<font color='#ffffff'>  session [new|n]   - Manage multi-sessions</font><br>");
         appendHistory("<font color='#ffffff'>  clear / exit      - Clear or exit session</font><br><br>");
     }
@@ -468,12 +483,12 @@ public class TrKZActivity extends AppCompatActivity {
         }
     }
 
-    private void focusAndShowKeyboard() {
-        if (hiddenEditText != null) {
-            hiddenEditText.requestFocus();
+    private void focusPromptInput() {
+        if (edtPromptInput != null) {
+            edtPromptInput.requestFocus();
             InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (imm != null) {
-                imm.showSoftInput(hiddenEditText, InputMethodManager.SHOW_FORCED);
+                imm.showSoftInput(edtPromptInput, InputMethodManager.SHOW_IMPLICIT);
             }
         }
     }
@@ -491,19 +506,12 @@ public class TrKZActivity extends AppCompatActivity {
             }
         });
 
-        findViewById(R.id.keySlash).setOnClickListener(v -> insertInputChar('/'));
+        findViewById(R.id.keySlash).setOnClickListener(v -> insertInputString("/"));
         findViewById(R.id.keyTab).setOnClickListener(v -> insertInputString("  "));
 
         findViewById(R.id.keyEsc).setOnClickListener(v -> {
-            Session s = getActiveSession();
-            s.currentInput = "";
-            if (hiddenEditText != null) {
-                isUpdatingDisplay = true;
-                hiddenEditText.setText("");
-                isUpdatingDisplay = false;
-            }
+            if (edtPromptInput != null) edtPromptInput.setText("");
             resetCtrlState();
-            updateTerminalDisplay();
         });
 
         findViewById(R.id.keyHome).setOnClickListener(v -> {
@@ -528,32 +536,21 @@ public class TrKZActivity extends AppCompatActivity {
         }
     }
 
-    private void insertInputChar(char c) {
-        Session s = getActiveSession();
-        s.currentInput += c;
-        if (hiddenEditText != null) {
-            isUpdatingDisplay = true;
-            hiddenEditText.setText(s.currentInput);
-            hiddenEditText.setSelection(s.currentInput.length());
-            isUpdatingDisplay = false;
-        }
-        updateTerminalDisplay();
-    }
-
     private void insertInputString(String str) {
-        Session s = getActiveSession();
-        s.currentInput += str;
-        if (hiddenEditText != null) {
-            isUpdatingDisplay = true;
-            hiddenEditText.setText(s.currentInput);
-            hiddenEditText.setSelection(s.currentInput.length());
-            isUpdatingDisplay = false;
+        if (edtPromptInput != null) {
+            int start = Math.max(edtPromptInput.getSelectionStart(), 0);
+            int end = Math.max(edtPromptInput.getSelectionEnd(), 0);
+            edtPromptInput.getText().replace(Math.min(start, end), Math.max(start, end), str, 0, str.length());
         }
-        updateTerminalDisplay();
     }
 
     private void moveInputCursor(int offset) {
-        updateTerminalDisplay();
+        if (edtPromptInput != null) {
+            int pos = edtPromptInput.getSelectionStart() + offset;
+            if (pos < 0) pos = 0;
+            if (pos > edtPromptInput.length()) pos = edtPromptInput.length();
+            edtPromptInput.setSelection(pos);
+        }
     }
 
     private void navigateHistory(int direction) {
@@ -564,24 +561,15 @@ public class TrKZActivity extends AppCompatActivity {
         if (s.historyIndex < 0) s.historyIndex = 0;
         if (s.historyIndex >= s.cmdHistory.size()) {
             s.historyIndex = s.cmdHistory.size();
-            s.currentInput = "";
-            if (hiddenEditText != null) {
-                isUpdatingDisplay = true;
-                hiddenEditText.setText("");
-                isUpdatingDisplay = false;
-            }
-            updateTerminalDisplay();
+            if (edtPromptInput != null) edtPromptInput.setText("");
             return;
         }
 
-        s.currentInput = s.cmdHistory.get(s.historyIndex);
-        if (hiddenEditText != null) {
-            isUpdatingDisplay = true;
-            hiddenEditText.setText(s.currentInput);
-            hiddenEditText.setSelection(s.currentInput.length());
-            isUpdatingDisplay = false;
+        String historicalCmd = s.cmdHistory.get(s.historyIndex);
+        if (edtPromptInput != null) {
+            edtPromptInput.setText(historicalCmd);
+            edtPromptInput.setSelection(historicalCmd.length());
         }
-        updateTerminalDisplay();
     }
 
     private void pasteClipboardText() {
@@ -592,15 +580,7 @@ public class TrKZActivity extends AppCompatActivity {
                 if (clipData != null && clipData.getItemCount() > 0) {
                     CharSequence pasteText = clipData.getItemAt(0).getText();
                     if (pasteText != null) {
-                        Session s = getActiveSession();
-                        s.currentInput += pasteText.toString();
-                        if (hiddenEditText != null) {
-                            isUpdatingDisplay = true;
-                            hiddenEditText.setText(s.currentInput);
-                            hiddenEditText.setSelection(s.currentInput.length());
-                            isUpdatingDisplay = false;
-                        }
-                        updateTerminalDisplay();
+                        insertInputString(pasteText.toString());
                     }
                 }
             }
